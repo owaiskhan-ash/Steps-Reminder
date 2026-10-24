@@ -10,7 +10,9 @@
     "preview": "vite preview --host 0.0.0.0",
     "icons": "node scripts/make-icons.mjs",
     "cap:sync": "npm run build && npx cap sync android",
-    "apk": "npm run cap:sync && cd android && ./gradlew assembleDebug"
+    "apk": "npm run apk:release",
+    "apk:debug": "npm run cap:sync && cd android && ./gradlew assembleDebug",
+    "apk:release": "npm run cap:sync && cd android && ./gradlew assembleRelease"
   },
   "dependencies": {
     "@capacitor/core": "^7.0.0",

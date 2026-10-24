@@ -50,12 +50,12 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Build APK
+      - name: Build signed release APK
         working-directory: android
         run: |
           chmod +x gradlew
           set +e
-          ./gradlew assembleDebug --no-daemon --console=plain --stacktrace 2>&1 | tee /tmp/gradle.log
+          ./gradlew assembleRelease --no-daemon --console=plain --stacktrace 2>&1 | tee /tmp/gradle.log
           status=${PIPESTATUS[0]}
           if [ "$status" -ne 0 ]; then
             # Surface the useful lines as annotations so the failure is readable
@@ -66,11 +66,23 @@ jobs:
           fi
           exit "$status"
 
+      - name: Verify signature and name the APK
+        working-directory: android
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          BT=$(ls "$ANDROID_HOME"/build-tools | sort -V | tail -1)
+          echo "Using build-tools $BT"
+          "$ANDROID_HOME/build-tools/$BT/apksigner" verify --print-certs "$APK" | tee /tmp/certs.txt
+          VERSION=$(grep -oE 'versionName "[^"]+"' app/build.gradle | head -1 | cut -d'"' -f2)
+          echo "APK_VERSION=$VERSION" >> "$GITHUB_ENV"
+          cp "$APK" "app/build/outputs/apk/release/SC-Step-Reminder-${VERSION}.apk"
+          ls -lh app/build/outputs/apk/release/
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: sc-step-reminder-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: sc-step-reminder-release-apk
+          path: android/app/build/outputs/apk/release/SC-Step-Reminder-*.apk
           if-no-files-found: error
           retention-days: 30
 
@@ -83,19 +95,24 @@ jobs:
       - name: Download APK
         uses: actions/download-artifact@v4
         with:
-          name: sc-step-reminder-debug-apk
+          name: sc-step-reminder-release-apk
 
       - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
-          files: app-debug.apk
+          files: SC-Step-Reminder-*.apk
           name: SC Step Reminder ${{ github.ref_name }}
           body: |
-            Installable Android build of SC · Step Reminder.
+            **SC · Step Reminder** — signed release build, ready to install.
 
-            `app-debug.apk` is signed with the debug key — sideload it for testing
-            (Settings → "Install unknown apps"). Counts steps from the motion
-            sensor while the app is open and sends the daily nudge at your chosen
-            time.
+            - Download `SC-Step-Reminder-*.apk`
+            - On the phone: open it, allow "Install unknown apps" when prompted
+            - Set your daily step target and reminder time on first launch
+
+            Counts steps from the motion sensor while the app is open and sends
+            the daily nudge at the hour you choose. Signed with the project's
+            release key, so newer releases install straight over this one.
+
+            Min Android 6.0 (API 23) · targets Android 15 (API 35).
           draft: false
           prerelease: false

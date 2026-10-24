@@ -54,8 +54,13 @@ access and counts for real.
 
 **[Download the latest APK →](https://github.com/owaiskhan-ash/Steps-Reminder/releases/latest)**
 
-Sideload it (Settings → install unknown apps). It is signed with the debug key, so it is meant for
-testing rather than the Play Store.
+A signed **release** build (`SC-Step-Reminder-<version>.apk`), Android 6.0+ (targets Android 15).
+Sideload it — Settings → "Install unknown apps" — and it counts steps from the motion sensor,
+nudging you at the hour you choose.
+
+It is signed with the project's committed release key, so each new release installs straight over
+the previous one. See `android/keystore/README.md`: that key is public and is **not** a Play Store
+key.
 
 ## Build the APK yourself
 
@@ -63,13 +68,17 @@ The Android project is already generated (`android/`, Capacitor 7, application i
 `com.sc.stepreminder`).
 
 ```bash
-npm run apk          # build web + sync + ./gradlew assembleDebug
-# → android/app/build/outputs/apk/debug/app-debug.apk
+npm run apk:release  # build web + sync + ./gradlew assembleRelease
+# → android/app/build/outputs/apk/release/SC-Step-Reminder-<version>.apk
 ```
 
+Signing details live in `android/keystore.properties`, which `app/build.gradle` reads. **Bump
+`versionCode`/`versionName` in `android/app/build.gradle` before each release**, then push a `v*`
+tag and CI builds, verifies the signature and attaches the APK to the release.
+
 Or let CI do it: **Actions → Build Android APK → Run workflow**, then download the
-`sc-step-reminder-debug-apk` artifact. That is a signed-with-debug-key APK — installable, good for
-testing, not for the Play Store. For a store build, add a keystore and run `assembleRelease`.
+`sc-step-reminder-release-apk` artifact. Tagged pushes (`v1.1.0`, …) also publish a GitHub Release
+with the APK attached. For the Play Store, swap in a private upload key and build an AAB.
 
 Icons are generated from `assets/icon.png` into every density, the adaptive foreground, the splash
 screen and the monochrome status-bar glyph:
