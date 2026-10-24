@@ -31,7 +31,7 @@ export function History({ state }: Props) {
       </header>
 
       <section className="card card--leather">
-        <Stitch inset={8} radius={16} double opacity={0.4} />
+        <Stitch inset={6} radius={16} double opacity={0.4} />
         <div className="label">This week</div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 8 }}>
           <span className="serif" style={{ fontSize: 32, lineHeight: 1, color: '#f6ead6' }}>
@@ -70,7 +70,7 @@ export function History({ state }: Props) {
 
       {entries.length === 0 ? (
         <div className="card card--felt">
-          <Stitch inset={8} radius={16} opacity={0.3} />
+          <Stitch inset={6} radius={16} opacity={0.3} />
           <div className="empty-state">
             <Footsteps size={26} style={{ color: 'var(--cream-faint)', marginBottom: 10 }} />
             <div>No days recorded yet.</div>

@@ -42,7 +42,7 @@ export function Settings({
       </header>
 
       <section className="card card--leather">
-        <Stitch inset={8} radius={16} double opacity={0.4} />
+        <Stitch inset={6} radius={16} double opacity={0.4} />
         <div className="field-label">
           <span className="label">
             <Footsteps size={12} style={{ verticalAlign: '-2px', marginRight: 6 }} />
@@ -77,7 +77,7 @@ export function Settings({
       </section>
 
       <section className="card card--felt">
-        <Stitch inset={8} radius={16} opacity={0.32} />
+        <Stitch inset={6} radius={16} opacity={0.32} />
         <div className="field-label">
           <span className="label">
             <Clock size={12} style={{ verticalAlign: '-2px', marginRight: 6 }} />
@@ -118,7 +118,7 @@ export function Settings({
       </section>
 
       <section className="card card--suede">
-        <Stitch inset={8} radius={16} color="rgba(74,45,22,.7)" opacity={0.6} />
+        <Stitch inset={6} radius={16} color="rgba(74,45,22,.7)" opacity={0.6} />
         <div className="field-label">
           <span className="label" style={{ color: 'rgba(42,26,14,.6)' }}>
             Sensor sensitivity
@@ -166,7 +166,7 @@ export function Settings({
       </section>
 
       <section className="card card--felt">
-        <Stitch inset={8} radius={16} opacity={0.3} />
+        <Stitch inset={6} radius={16} opacity={0.3} />
         <div className="settings-row" style={{ paddingTop: 0 }}>
           <div>
             <div className="settings-row-title">Reset everything</div>

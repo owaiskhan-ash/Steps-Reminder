@@ -16,7 +16,7 @@ type Props = {
  * card size. A ResizeObserver keeps it in pixel space (no stretched threads).
  */
 export function Stitch({
-  inset = 7,
+  inset = 6,
   radius = 16,
   dash = '6 6',
   width = 1.4,

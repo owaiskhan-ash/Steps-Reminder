@@ -44,7 +44,7 @@ export function Onboarding({ initialGoal, initialTime, onComplete }: Props) {
 
       {step === 0 ? (
         <div className="card card--leather">
-          <Stitch inset={8} radius={16} double />
+          <Stitch inset={6} radius={16} double />
           <div className="field-label">
             <span className="label">Daily step target</span>
             <span className="field-value">
@@ -88,7 +88,7 @@ export function Onboarding({ initialGoal, initialTime, onComplete }: Props) {
         </div>
       ) : (
         <div className="card card--leather">
-          <Stitch inset={8} radius={16} double />
+          <Stitch inset={6} radius={16} double />
           <div className="field-label">
             <span className="label">Reminder time</span>
             <span className="field-value" style={{ fontSize: 15 }}>

@@ -79,7 +79,7 @@ export function Today({
       </header>
 
       <section className="card card--leather dial-card">
-        <Stitch inset={9} radius={17} double opacity={0.42} />
+        <Stitch inset={6} radius={16} double opacity={0.42} />
         <div className="dial-head">
           <span className="label">{prettyDate()}</span>
           <span className={`chip ${live || simulating ? 'chip--live' : ''}`}>
@@ -127,7 +127,7 @@ export function Today({
       </section>
 
       <section className="card card--felt">
-        <Stitch inset={8} radius={16} opacity={0.34} />
+        <Stitch inset={6} radius={16} opacity={0.34} />
         <div className="reminder">
           <div className="reminder-icon">
             <Bell size={19} />
@@ -167,7 +167,7 @@ export function Today({
       </section>
 
       <section className="card card--suede">
-        <Stitch inset={8} radius={16} color="rgba(74,45,22,.7)" opacity={0.6} />
+        <Stitch inset={6} radius={16} color="rgba(74,45,22,.7)" opacity={0.6} />
         <div className="tracker-head">
           <div>
             <div className="tracker-title deboss" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -195,7 +195,7 @@ export function Today({
       </section>
 
       <section className="card card--felt">
-        <Stitch inset={8} radius={16} opacity={0.32} />
+        <Stitch inset={6} radius={16} opacity={0.32} />
         <div className="week-head">
           <div>
             <div className="label">Last seven days</div>
