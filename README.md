@@ -18,7 +18,11 @@ slipping away short of your mark, it says so in plain words:
   `TYPE_STEP_COUNTER` through a small native plugin (`StepCounterPlugin`), so counting is done by
   the platform's motion classifier with the `ACTIVITY_RECOGNITION` permission — hand swinging and
   shaking simply do not register, and battery use is far lower than sampling motion.
-- **Accelerometer fallback** for devices (or browsers) without a step sensor — and only real ones. Gravity is tracked per axis,
+- **Accelerometer fallback** for devices (or browsers) without a step sensor, with five gates: world-frame
+  gravity projection, a **gyroscope gate** (walking rocks the phone gently; arm swinging, figure-8s and
+  revolutions exceed the angular limit and are discarded), cadence, impact-shaped waveform, and a
+  **sustained-walk requirement** (nothing is credited until 8 consecutive valid footfalls confirm you are
+  walking). Gravity is tracked per axis,
   the signed vertical bounce is smoothed and detected with hysteresis, and a footfall is credited
   only once the **rhythm** holds: peaks must fall inside a human cadence window (0.3–1.5 s apart)
   with low variance, **and the waveform looks like an impact** (positive skew, high crest factor)
@@ -121,5 +125,9 @@ android/                  Capacitor Android project
 ```
 
 ## Privacy
+
+**Tune → Detector diagnostics** shows live sensor type, rotation rate against its limit, cadence,
+skew/crest of the waveform, the current walk run and the verdict — enough to see exactly why a step was
+accepted or rejected.
 
 Steps, goals and history never leave the device. There is no network call in the app at runtime.

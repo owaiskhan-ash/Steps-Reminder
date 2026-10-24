@@ -201,6 +201,9 @@ export default function App() {
             state={state}
             steps={steps}
             simulating={simulating}
+            trackerStatus={tracker.status}
+            trackerDetail={tracker.detail}
+            diagnostics={tracker.diagnostics}
             onGoal={setGoal}
             onTime={setReminderTime}
             onSensitivity={(n) => setState((prev) => ({ ...prev, sensitivity: n }))}

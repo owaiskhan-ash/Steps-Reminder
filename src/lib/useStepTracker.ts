@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { StepDetector } from './pedometer'
+import { StepDetector, type DetectorDiagnostics } from './pedometer'
 import { isNative } from './notify'
 import { startNativeSteps } from './nativeSteps'
 
 export type TrackerStatus = 'idle' | 'requesting' | 'running' | 'denied' | 'unsupported'
+
+export type { DetectorDiagnostics }
 
 type Options = {
   enabled: boolean
@@ -22,6 +24,7 @@ type MotionEventCtor = {
 export function useStepTracker({ enabled, sensitivity, onStep }: Options) {
   const [status, setStatus] = useState<TrackerStatus>('idle')
   const [detail, setDetail] = useState<string>('')
+  const [diagnostics, setDiagnostics] = useState<DetectorDiagnostics | null>(null)
   const detector = useRef<StepDetector | null>(null)
   const onStepRef = useRef(onStep)
   const stopRef = useRef<(() => void) | null>(null)
@@ -32,6 +35,7 @@ export function useStepTracker({ enabled, sensitivity, onStep }: Options) {
       detector.current = new StepDetector({
         sensitivity,
         onStep: () => onStepRef.current(),
+        onDiagnostics: (snapshot) => setDiagnostics(snapshot),
       })
     } else {
       detector.current.setSensitivity(sensitivity)
@@ -63,11 +67,12 @@ export function useStepTracker({ enabled, sensitivity, onStep }: Options) {
       const listener = (event: DeviceMotionEvent) => {
         const a = event.accelerationIncludingGravity ?? event.acceleration
         if (!a) return
-        detector.current?.push({
-          x: a.x ?? 0,
-          y: a.y ?? 0,
-          z: a.z ?? 0,
-        })
+        const r = event.rotationRate
+        detector.current?.push(
+          { x: a.x ?? 0, y: a.y ?? 0, z: a.z ?? 0 },
+          Date.now(),
+          r ? { alpha: r.alpha ?? 0, beta: r.beta ?? 0, gamma: r.gamma ?? 0 } : undefined,
+        )
       }
       window.addEventListener('devicemotion', listener)
       webAttached = true
@@ -112,11 +117,18 @@ export function useStepTracker({ enabled, sensitivity, onStep }: Options) {
         try {
           const { Motion } = await import('@capacitor/motion')
           const handler = await Motion.addListener('accel', (event) => {
-            detector.current?.push({
-              x: event.acceleration.x ?? 0,
-              y: event.acceleration.y ?? 0,
-              z: event.acceleration.z ?? 0,
-            })
+            const rate = event.rotationRate
+            detector.current?.push(
+              {
+                x: event.acceleration.x ?? 0,
+                y: event.acceleration.y ?? 0,
+                z: event.acceleration.z ?? 0,
+              },
+              Date.now(),
+              rate
+                ? { alpha: rate.alpha ?? 0, beta: rate.beta ?? 0, gamma: rate.gamma ?? 0 }
+                : undefined,
+            )
           })
           if (cancelled) {
             handler.remove()
@@ -181,7 +193,7 @@ export function useStepTracker({ enabled, sensitivity, onStep }: Options) {
     }
   }, [enabled, stop])
 
-  return { status, detail, stop }
+  return { status, detail, diagnostics, stop }
 }
 
 /** Desktop/demo helper: walks a plausible cadence so the UI can be seen working. */

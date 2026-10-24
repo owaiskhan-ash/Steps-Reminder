@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Stitch } from '../components/Stitch'
 import { Modal } from '../components/Modal'
 import { Bell, Clock, Footsteps, House, Play, Ruler, Pause } from '../components/Icons'
+import type { DetectorDiagnostics, TrackerStatus } from '../lib/useStepTracker'
 import { fmt, minutesUntil, prettyTime } from '../lib/format'
 import type { AppState } from '../lib/storage'
 import { testNotification } from '../lib/notify'
@@ -10,6 +11,9 @@ type Props = {
   state: AppState
   steps: number
   simulating: boolean
+  trackerStatus: TrackerStatus
+  trackerDetail: string
+  diagnostics: DetectorDiagnostics | null
   onGoal: (goal: number) => void
   onTime: (time: string) => void
   onSensitivity: (n: number) => void
@@ -26,6 +30,9 @@ export function Settings({
   state,
   steps,
   simulating,
+  trackerStatus,
+  trackerDetail,
+  diagnostics,
   onGoal,
   onTime,
   onSensitivity,
@@ -147,9 +154,10 @@ export function Settings({
           aria-label="Step detection sensitivity"
         />
         <p className="hint" style={{ color: 'rgba(20,11,7,.62)' }}>
-          On Android the hardware pedometer does the counting and ignores hand movement
-          entirely. Without it, steps only count when both the rhythm and the impact shape of
-          your walking hold — swinging or shaking the phone adds nothing.
+          On Android the hardware pedometer counts and ignores hand movement entirely. Otherwise a
+          step needs gentle rotation, steady cadence and an impact-shaped waveform, and only counts
+          once you have taken several in a row. Rotating, swinging or shaking the phone adds
+          nothing.
         </p>
 
         <div style={{ height: 1, background: 'rgba(74,45,22,.18)', margin: '16px 0 4px' }} />
@@ -174,6 +182,72 @@ export function Settings({
           onChange={(e) => onStride(Number(e.target.value))}
           aria-label="Stride length"
         />
+      </section>
+
+      <section className="card card--felt">
+        <Stitch inset={6} radius={16} opacity={0.34} />
+        <div className="label">Detector diagnostics</div>
+        <div className="diag-grid">
+          <DiagRow label="Sensor" value={trackerDetail || 'starting…'} />
+          <DiagRow
+            label="Status"
+            value={
+              trackerStatus === 'running'
+                ? 'listening'
+                : trackerStatus === 'requesting'
+                  ? 'starting'
+                  : trackerStatus
+            }
+          />
+          <DiagRow
+            label="Gyroscope"
+            value={diagnostics ? (diagnostics.hasGyro ? 'active' : 'unavailable') : '—'}
+          />
+          <DiagRow
+            label="Rotation"
+            value={
+              diagnostics
+                ? `${(diagnostics.angular * (180 / Math.PI)).toFixed(0)}°/s of ${(diagnostics.angularLimit * (180 / Math.PI)).toFixed(0)}`
+                : '—'
+            }
+            warn={!!diagnostics && diagnostics.angular > diagnostics.angularLimit * 0.75}
+          />
+          <DiagRow
+            label="Cadence"
+            value={diagnostics && diagnostics.cadence ? `${diagnostics.cadence} steps/min` : '—'}
+          />
+          <DiagRow
+            label="Impulse"
+            value={
+              diagnostics
+                ? `skew ${diagnostics.skew.toFixed(2)} · crest ${diagnostics.crest.toFixed(2)}`
+                : '—'
+            }
+            warn={!!diagnostics && diagnostics.skew < 0.2 && diagnostics.crest > 0}
+          />
+          <DiagRow
+            label="Walk run"
+            value={
+              diagnostics
+                ? `${diagnostics.sustain} / ${diagnostics.sustainNeeded} steps`
+                : '—'
+            }
+          />
+          <DiagRow label="Verdict" value={diagnostics?.lastReason ?? '—'} />
+          <DiagRow
+            label="Credited"
+            value={
+              diagnostics
+                ? `${diagnostics.accepted} counted · ${diagnostics.rejected} rejected`
+                : '—'
+            }
+          />
+        </div>
+        <p className="hint" style={{ marginTop: 12 }}>
+          Walk a few paces and this should read “counting”. Rotate, swing or shake the phone and
+          watch Rotation cross its limit, or the Impulse line give way — either one is enough to
+          reject a step.
+        </p>
       </section>
 
       <section className="card card--felt">
@@ -214,7 +288,7 @@ export function Settings({
           <div>
             <div className="settings-row-title">SC · Step Reminder</div>
             <div className="settings-row-sub">
-              Version 1.1.2 · leather, felt and suede · made quietly
+              Version 1.2.0 · leather, felt and suede · made quietly
             </div>
           </div>
         </div>
@@ -242,6 +316,23 @@ export function Settings({
       <p className="footnote" style={{ marginTop: 'auto' }}>
         Reminders use local notifications. No account, no cloud, no tracking.
       </p>
+    </div>
+  )
+}
+
+function DiagRow({
+  label,
+  value,
+  warn = false,
+}: {
+  label: string
+  value: string
+  warn?: boolean
+}) {
+  return (
+    <div className="diag-row">
+      <span className="diag-label">{label}</span>
+      <span className={`diag-value ${warn ? 'diag-value--warn' : ''}`}>{value}</span>
     </div>
   )
 }

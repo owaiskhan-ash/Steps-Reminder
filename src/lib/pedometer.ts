@@ -1,27 +1,23 @@
 /**
- * Conservative accelerometer step detector.
+ * Conservative footfall detector.
  *
- * A phone gets bumped and waved all day, and naive peak counting turns every
- * jostle into a "step". This detector only counts a footfall when the motion
- * *looks like walking*:
+ * A phone gets rotated, waved, swung in figures of eight and spun in circles all
+ * day, and every one of those produces real acceleration. Counting peaks is
+ * therefore hopeless on its own. A footfall is only credited when *everything*
+ * below agrees:
  *
- *  1. Vector gravity tracking, then the *signed* acceleration along gravity —
- *     the vertical bounce of a footfall. (Using |linear| instead would rectify
- *     the signal and halve the apparent cadence.) Orientation changes and slow
- *     tilts produce nothing.
- *  2. Time-constant smoothing, so a single jolt is one broad hump rather than a
- *     burst of peaks.
- *  3. Hysteresis peak detection — the signal must climb past a high threshold
- *     and fall back below a low one before another peak can register.
- *  4. **Rhythm validation** — a run of peaks only becomes steps when the
- *     intervals between them are consistent (all inside a human cadence window
- *     and low variance).
- *  5. **Shape validation** — a walking step is a soft *impact*: a fast rise and
- *     a slower settle. The signal is therefore positively skewed with a high
- *     crest factor. Swinging the phone is a near-perfect sine wave (skew ≈ 0,
- *     crest ≈ 1.5) and random shaking is symmetric too, so both are rejected
- *     even when their rhythm looks convincing. This is what stops hand
- *     swinging from counting.
+ *  1. **World-frame vertical** — gravity is tracked per axis (with a fast
+ *     re-lock) so acceleration is projected onto true vertical, not the phone's
+ *     own axes. Spinning the phone then cannot manufacture vertical signal.
+ *  2. **Gyroscope gate** — walking rocks the phone gently (peak angular speed
+ *     well under ~2 rad/s). Arm swinging, figure-8s and handling the phone in
+ *     revolutions all exceed it, so those intervals are discarded outright.
+ *  3. **Cadence** — peaks must fall 0.3–1.5 s apart with low variance.
+ *  4. **Impact shape** — a footfall is an impact (positive skew, high crest
+ *     factor); a swung phone is a near-perfect sine and fails.
+ *  5. **Sustained walking** — validated footfalls are buffered and only credited
+ *     once a run of consecutive ones confirms you are actually walking. A
+ *     gesture that fools the other tests for a second or two still adds nothing.
  */
 
 export type AccelSample = {
@@ -30,17 +26,33 @@ export type AccelSample = {
   z: number
 }
 
+/** Angular velocity in degrees per second, as browsers report it. */
+export type RotationSample = {
+  alpha: number
+  beta: number
+  gamma: number
+}
+
+const DEG_TO_RAD = Math.PI / 180
+
 /** Plausible time between footfalls, in seconds. */
 const MIN_CADENCE = 0.3
 const MAX_CADENCE = 1.5
 /** Peaks closer together than this are the same footfall. */
 const SAME_PEAK_GAP = 0.22
-/** Forgetting a walk after this long without a peak. */
+/** A gap this long ends the current walk. */
 const RHYTHM_TIMEOUT_MS = 2500
 /** How many peaks we keep while judging rhythm. */
 const PEAK_WINDOW = 6
 /** Trailing samples used for the shape test (~2.5 s at 50 Hz). */
 const SHAPE_WINDOW = 128
+
+/** Angular speed above which we assume deliberate handling, not walking. */
+export const ANGULAR_LIMIT = 2.2 // rad/s ≈ 126 °/s
+/** Angular speed that marks the whole recent window as non-walking. */
+export const ANGULAR_SUSTAINED = 3.2
+/** Consecutive validated footfalls required before anything is credited. */
+export const SUSTAIN_MIN = 8
 
 export type ShapeStats = {
   skew: number
@@ -69,44 +81,59 @@ export function shapeStats(xs: number[]): ShapeStats {
   return { skew: sum3 / n / sd ** 3, crest: max / sd }
 }
 
-export type DetectorOptions = {
-  sensitivity: number
-  onStep: (at: number) => void
-}
-
 /**
- * The detector triggers on a fraction of the recent peak envelope rather than a
- * fixed g threshold, so a gentle walker and a brisk one are both counted. This
- * is the ratio applied to that envelope; strict sensitivity asks for a fuller
- * peak. Absolute floor keeps sensor noise from ever looking like a footfall.
+ * Trigger level as a fraction of the recent peak envelope. Strict sensitivity
+ * asks for a fuller peak; the absolute floor stops sensor noise ever counting.
  */
 export function peakRatioFor(sensitivity: number): number {
   const clamped = Math.min(5, Math.max(1, sensitivity))
-  return 0.62 - (clamped - 1) * 0.045 // 0.62 (strict) … 0.44 (loose)
+  return 0.62 - (clamped - 1) * 0.045
 }
 
 export function noiseFloorFor(sensitivity: number): number {
   const clamped = Math.min(5, Math.max(1, sensitivity))
-  return 1.0 - (clamped - 1) * 0.06 // 1.00 … 0.76 m/s²
-}
-
-/** Kept for callers that want a single representative number. */
-export function thresholdFor(sensitivity: number): number {
-  return noiseFloorFor(sensitivity)
+  return 1.0 - (clamped - 1) * 0.06
 }
 
 export function cadenceToleranceFor(sensitivity: number): number {
   const clamped = Math.min(5, Math.max(1, sensitivity))
-  return 0.26 + (clamped - 1) * 0.025 // coefficient of variation 0.26 … 0.36
+  return 0.26 + (clamped - 1) * 0.025
 }
 
-/** How impulse-like the signal must be. Loosens as sensitivity rises. */
+/** How impulse-like the signal must be. Loosens slightly as sensitivity rises. */
 export function shapeLimitsFor(sensitivity: number) {
   const clamped = Math.min(5, Math.max(1, sensitivity))
   return {
-    skew: 0.34 - (clamped - 1) * 0.025, // 0.34 … 0.24
-    crest: 1.86 - (clamped - 1) * 0.03, // 1.86 … 1.74
+    skew: 0.34 - (clamped - 1) * 0.025,
+    crest: 1.86 - (clamped - 1) * 0.03,
   }
+}
+
+/** Angular gate loosens a little with sensitivity, but never much. */
+export function angularLimitFor(sensitivity: number): number {
+  const clamped = Math.min(5, Math.max(1, sensitivity))
+  return ANGULAR_LIMIT + (clamped - 1) * 0.12
+}
+
+export type DetectorDiagnostics = {
+  angular: number
+  angularLimit: number
+  cadence: number
+  skew: number
+  crest: number
+  sustain: number
+  sustainNeeded: number
+  hasGyro: boolean
+  lastReason: string
+  accepted: number
+  rejected: number
+}
+
+export type DetectorOptions = {
+  sensitivity: number
+  onStep: (at: number) => void
+  /** Called whenever the diagnostics snapshot changes materially. */
+  onDiagnostics?: (snapshot: DetectorDiagnostics) => void
 }
 
 export class StepDetector {
@@ -114,42 +141,56 @@ export class StepDetector {
   private primed = false
   private lastSampleAt = 0
   private smoothed = 0
-  private peaked = false
-  /** Decaying peak envelope of the smoothed signal, used for the trigger. */
-  private envelope = 0
-  private peakRatio: number
-  private floor: number
-  private cvLimit: number
-  private onStep: (at: number) => void
 
-  /** Timestamps (ms) of recent candidate peaks, oldest first. */
+  private peaked = false
+  private envelope = 0
+  private peakRatio = 0.575
+  private floor = 0.94
+  private cvLimit = 0.285
+  private skewLimit = 0.315
+  private crestLimit = 1.83
+  private angularLimit = ANGULAR_LIMIT
+
   private peaks: number[] = []
-  /** Trailing vertical samples, used for the impulse-shape test. */
   private window: number[] = []
-  private skewLimit: number
-  private crestLimit: number
-  /** Peaks at or before this time have already been counted. */
-  private countedThrough = 0
-  /** How many usable samples have arrived — used to detect a dead sensor. */
+  /** Decaying peak of the angular speed (rad/s) over the last ~1.5 s. */
+  private angularPeak = 0
+  private angularSmoothed = 0
+  private hasGyro = false
+
+  /** Validated footfalls waiting for the walk to be confirmed. */
+  private run: number[] = []
+  private emitted = 0
+
+  private lastShape: ShapeStats = { skew: 0, crest: 0 }
+  private lastReason = 'waiting'
+  private accepted = 0
+  private rejected = 0
+  private lastDiagAt = 0
+
+  private onStep: (at: number) => void
+  private onDiagnostics?: (snapshot: DetectorDiagnostics) => void
+
   samples = 0
 
   constructor(options: DetectorOptions) {
-    this.peakRatio = peakRatioFor(options.sensitivity)
-    this.floor = noiseFloorFor(options.sensitivity)
-    this.cvLimit = cadenceToleranceFor(options.sensitivity)
-    const limits = shapeLimitsFor(options.sensitivity)
-    this.skewLimit = limits.skew
-    this.crestLimit = limits.crest
     this.onStep = options.onStep
+    this.onDiagnostics = options.onDiagnostics
+    this.applySensitivity(options.sensitivity)
   }
 
   setSensitivity(sensitivity: number) {
+    this.applySensitivity(sensitivity)
+  }
+
+  private applySensitivity(sensitivity: number) {
     this.peakRatio = peakRatioFor(sensitivity)
     this.floor = noiseFloorFor(sensitivity)
     this.cvLimit = cadenceToleranceFor(sensitivity)
-    const limits = shapeLimitsFor(sensitivity)
-    this.skewLimit = limits.skew
-    this.crestLimit = limits.crest
+    const shape = shapeLimitsFor(sensitivity)
+    this.skewLimit = shape.skew
+    this.crestLimit = shape.crest
+    this.angularLimit = angularLimitFor(sensitivity)
   }
 
   reset() {
@@ -157,15 +198,39 @@ export class StepDetector {
     this.primed = false
     this.smoothed = 0
     this.peaked = false
+    this.envelope = 0
     this.peaks = []
     this.window = []
-    this.envelope = 0
-    this.countedThrough = 0
+    this.run = []
+    this.emitted = 0
+    this.angularPeak = 0
+    this.angularSmoothed = 0
     this.lastSampleAt = 0
+    this.lastReason = 'waiting'
+  }
+
+  diagnostics(): DetectorDiagnostics {
+    const mean =
+      this.peaks.length > 1
+        ? (this.peaks[this.peaks.length - 1] - this.peaks[0]) / (this.peaks.length - 1)
+        : 0
+    return {
+      angular: this.angularSmoothed,
+      angularLimit: this.angularLimit,
+      cadence: mean > 0 ? Math.round(60000 / mean) : 0,
+      skew: this.lastShape.skew,
+      crest: this.lastShape.crest,
+      sustain: Math.min(this.run.length, SUSTAIN_MIN),
+      sustainNeeded: SUSTAIN_MIN,
+      hasGyro: this.hasGyro,
+      lastReason: this.lastReason,
+      accepted: this.accepted,
+      rejected: this.rejected,
+    }
   }
 
   /** Feed one acceleration sample (m/s², gravity included). */
-  push(sample: AccelSample, now = Date.now()) {
+  push(sample: AccelSample, now = Date.now(), rotation?: RotationSample) {
     const { x, y, z } = sample
     if (![x, y, z].every((v) => Number.isFinite(v))) return
     const magnitude = Math.sqrt(x * x + y * y + z * z)
@@ -179,12 +244,13 @@ export class StepDetector {
       return
     }
 
-    // Guard against tab-suspension time jumps.
     const dt = Math.min(0.1, Math.max(0.002, (now - this.lastSampleAt) / 1000))
     this.lastSampleAt = now
 
-    // 1. Track gravity with a ~0.45 s time constant, independent of sample rate.
-    const gravityAlpha = dt / (0.45 + dt)
+    // 1. Gravity tracking with a fast re-lock: normally slow and steady, but if
+    //    |a| sits far from |g| (or the phone was clearly being rotated) the
+    //    estimate is allowed to catch up quickly so the world frame stays true.
+    const gravityAlpha = dt / (0.35 + dt)
     this.gravity.x += (x - this.gravity.x) * gravityAlpha
     this.gravity.y += (y - this.gravity.y) * gravityAlpha
     this.gravity.z += (z - this.gravity.z) * gravityAlpha
@@ -193,21 +259,33 @@ export class StepDetector {
       this.gravity.x ** 2 + this.gravity.y ** 2 + this.gravity.z ** 2,
     )
     if (gMag < 1) return
-    // Signed vertical acceleration: positive when the phone is pushed up along
-    // the gravity axis. One crest per footfall, unlike a rectified magnitude.
+
+    // Signed acceleration along gravity — the vertical bounce of a footfall.
     const radial =
       (x * this.gravity.x + y * this.gravity.y + z * this.gravity.z) / gMag - gMag
 
-    // 2. Light smoothing (~20 ms) to tame sensor noise without flattening the
-    //    impulse — a footfall lasts only ~0.2 s.
     const smoothAlpha = dt / (0.02 + dt)
     this.smoothed += (radial - this.smoothed) * smoothAlpha
 
     this.window.push(this.smoothed)
     if (this.window.length > SHAPE_WINDOW) this.window.shift()
 
-    // 3. Dynamic trigger: a fraction of the decaying peak envelope, never below
-    //    the absolute noise floor. Adapts to how hard the phone is bouncing.
+    // 2. Gyroscope bookkeeping.
+    if (rotation) {
+      const omega =
+        Math.sqrt(rotation.alpha ** 2 + rotation.beta ** 2 + rotation.gamma ** 2) * DEG_TO_RAD
+      if (Number.isFinite(omega)) {
+        this.hasGyro = true
+        this.angularSmoothed += (omega - this.angularSmoothed) * (dt / (0.12 + dt))
+        this.angularPeak = Math.max(omega, this.angularPeak * Math.exp(-dt / 1.5))
+        if (this.angularPeak > ANGULAR_SUSTAINED) {
+          // The phone is being handled, not carried: drop the current walk.
+          this.clearRun('rolling')
+        }
+      }
+    }
+
+    // 3. Dynamic trigger on a fraction of the decaying peak envelope.
     const envelopeDecay = Math.exp(-dt / 3)
     this.envelope = Math.max(this.smoothed, this.envelope * envelopeDecay)
     const trigger = Math.max(this.floor, this.envelope * this.peakRatio)
@@ -219,29 +297,37 @@ export class StepDetector {
     } else if (this.peaked && this.smoothed < rearm) {
       this.peaked = false
     }
+
+    if (now - this.lastDiagAt > 250) {
+      this.lastDiagAt = now
+      this.onDiagnostics?.(this.diagnostics())
+    }
+  }
+
+  private clearRun(reason: string) {
+    if (this.run.length) this.rejected += this.run.length
+    this.run = []
+    this.emitted = 0
+    if (this.accepted > 0 || this.rejected > 0) this.lastReason = reason
   }
 
   private onPeak(now: number) {
     const last = this.peaks[this.peaks.length - 1]
-    // Same footfall arriving in a couple of samples, or an impossibly fast one.
     if (last !== undefined && now - last < SAME_PEAK_GAP * 1000) return
 
-    // A long gap means the previous walk ended; the new one must earn its rhythm.
     if (last !== undefined && now - last > RHYTHM_TIMEOUT_MS) {
       this.peaks = []
+      this.clearRun('walk ended')
     }
 
     this.peaks.push(now)
     if (this.peaks.length > PEAK_WINDOW) this.peaks.shift()
 
-    this.commitIfRhythmic()
+    this.validate(now)
   }
 
-  /**
-   * Counts pending peaks only once the intervals between them look like walking.
-   * Irregular nudges fail the variance test and are silently discarded.
-   */
-  private commitIfRhythmic() {
+  /** Rhythm + shape + gyroscope must all agree before a peak becomes a step. */
+  private validate(now: number) {
     const peaks = this.peaks
     if (peaks.length < 3) return
 
@@ -249,33 +335,48 @@ export class StepDetector {
     for (let i = 1; i < peaks.length; i++) {
       intervals.push((peaks[i] - peaks[i - 1]) / 1000)
     }
-
-    // Judge the two or three most recent intervals.
     const recent = intervals.slice(-3)
     if (recent.length < 2) return
-    if (!recent.every((v) => v >= MIN_CADENCE && v <= MAX_CADENCE)) return
+    if (!recent.every((v) => v >= MIN_CADENCE && v <= MAX_CADENCE)) {
+      this.lastReason = 'irregular timing'
+      return
+    }
 
     const mean = recent.reduce((a, b) => a + b, 0) / recent.length
     const variance = recent.reduce((a, b) => a + (b - mean) ** 2, 0) / recent.length
     const cv = Math.sqrt(variance) / mean
-    if (cv > this.cvLimit) return
+    if (cv > this.cvLimit) {
+      this.lastReason = 'irregular timing'
+      return
+    }
 
-    // 5. Shape test: only an impact-like signal counts. A sine wave (hand swing)
-    //    is symmetric with a low crest factor and is discarded here.
+    // Gyroscope gate: gentle rock yes, deliberate handling no.
+    if (this.hasGyro && this.angularPeak > this.angularLimit) {
+      this.rejected++
+      this.lastReason = 'phone being moved'
+      this.clearRun('phone being moved')
+      return
+    }
+
+    // Impact shape: a swung phone is a sine wave and fails here.
     const shape = shapeStats(this.window)
-    if (shape.skew < this.skewLimit || shape.crest < this.crestLimit) return
+    this.lastShape = shape
+    if (shape.skew < this.skewLimit || shape.crest < this.crestLimit) {
+      this.rejected++
+      this.lastReason = 'smooth motion'
+      return
+    }
 
-    // Rhythm confirmed — credit the peaks that made the pattern, plus anything
-    // since the last commit, and let later peaks ride along while it holds.
-    const pending = peaks.filter((t) => t > this.countedThrough)
-    if (!pending.length) return
+    // Everything agreed — buffer it until the walk is confirmed.
+    this.run.push(now)
+    this.lastReason = this.run.length >= SUSTAIN_MIN ? 'counting' : 'confirming walk'
 
-    const latest = pending[pending.length - 1]
-    this.countedThrough = latest
-
-    for (let i = 0; i < pending.length; i++) {
-      // Spread the credit slightly so a burst doesn't land in one millisecond.
-      this.onStep(pending[i])
+    if (this.run.length >= SUSTAIN_MIN) {
+      while (this.emitted < this.run.length) {
+        this.onStep(this.run[this.emitted])
+        this.emitted++
+        this.accepted++
+      }
     }
   }
 }
