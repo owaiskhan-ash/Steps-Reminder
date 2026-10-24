@@ -112,10 +112,8 @@ if (hasAndroid) {
       .toFile(join(dir, 'ic_launcher_foreground.png'))
   }
 
-  // Adaptive icon background layer: a flat leather tone.
-  await sharp({ create: { width: 432, height: 432, channels: 4, background: { r: 60, g: 38, b: 20, alpha: 1 } } })
-    .png()
-    .toFile(join(androidRes, 'mipmap-xxxhdpi/ic_launcher_background.png'))
+  // The adaptive background is a flat leather tone declared in
+  // res/values/ic_launcher_background.xml (a PNG here would collide).
 
   // Status-bar icon must be a flat white silhouette on transparency.
   const statusDir = join(androidRes, 'drawable')
