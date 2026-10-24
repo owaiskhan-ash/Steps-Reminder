@@ -1,0 +1,127 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main, 'arena/**']
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    name: Assemble signed release APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Locate Android SDK
+        run: |
+          if [ -z "$ANDROID_HOME" ]; then
+            echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+          fi
+          echo "SDK at ${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          ls "${ANDROID_HOME:-/usr/local/lib/android/sdk}" || true
+          yes | "${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate icons
+        run: npm run icons
+
+      - name: Build web assets
+        run: npm run build
+
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Build signed release APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          set +e
+          ./gradlew assembleRelease --no-daemon --console=plain --stacktrace 2>&1 | tee /tmp/gradle.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            # Surface the useful lines as annotations so the failure is readable
+            # from the checks API without downloading the full log.
+            grep -nE "^e: |error:|FAILURE:|What went wrong|Caused by:|^> |Unsupported|not found|SDK" /tmp/gradle.log | tail -n 25 | while IFS= read -r line; do
+              echo "::error::${line}"
+            done
+          fi
+          exit "$status"
+
+      - name: Verify signature and name the APK
+        working-directory: android
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          BT=$(ls "$ANDROID_HOME"/build-tools | sort -V | tail -1)
+          echo "Using build-tools $BT"
+          "$ANDROID_HOME/build-tools/$BT/apksigner" verify --print-certs "$APK" > /tmp/certs.txt
+          cat /tmp/certs.txt
+          # apksigner prints digests without separators; normalise before comparing.
+          fp=$(tr -d ': \n' < /tmp/certs.txt | tr 'A-Z' 'a-z' | grep -o '1712b86b8c1e3f47de60ccce65f600d3b40f1d46344160cb0134ea226f6b7713' || true)
+          if [ "$fp" = "1712b86b8c1e3f47de60ccce65f600d3b40f1d46344160cb0134ea226f6b7713" ]; then
+            echo "Signed with the project release key ✓"
+          else
+            echo "::error::APK is not signed with the project release key"
+            exit 1
+          fi
+          VERSION=$(grep -oE 'versionName "[^"]+"' app/build.gradle | head -1 | cut -d'"' -f2)
+          echo "APK_VERSION=$VERSION" >> "$GITHUB_ENV"
+          cp "$APK" "app/build/outputs/apk/release/SC-Step-Reminder-${VERSION}.apk"
+          ls -lh app/build/outputs/apk/release/
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sc-step-reminder-release-apk
+          path: android/app/build/outputs/apk/release/SC-Step-Reminder-*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+  release:
+    name: Attach APK to release
+    needs: apk
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: sc-step-reminder-release-apk
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: SC-Step-Reminder-*.apk
+          name: SC Step Reminder ${{ github.ref_name }}
+          body: |
+            **SC · Step Reminder** — signed release build, ready to install.
+
+            - Download `SC-Step-Reminder-*.apk`
+            - On the phone: open it, allow "Install unknown apps" when prompted
+            - Set your daily step target and reminder time on first launch
+
+            Counts steps from the motion sensor while the app is open and sends
+            the daily nudge at the hour you choose. Signed with the project's
+            release key, so newer releases install straight over this one.
+
+            Min Android 6.0 (API 23) · targets Android 15 (API 35).
+          draft: false
+          prerelease: false

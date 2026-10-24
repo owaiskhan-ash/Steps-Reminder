@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <color name="colorPrimary">#4E2F24</color>
+    <color name="colorPrimaryDark">#1E1410</color>
+    <color name="colorAccent">#C69B68</color>
+    <color name="leatherNight">#120E0B</color>
+    <color name="leatherDeep">#1A1210</color>
+    <color name="threadCream">#F0E3CC</color>
+</resources>
