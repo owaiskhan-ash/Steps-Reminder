@@ -3,7 +3,11 @@ name: Build Android APK
 on:
   push:
     branches: [main, 'arena/**']
+    tags: ['v*']
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   apk:
@@ -25,8 +29,14 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Locate Android SDK
+        run: |
+          if [ -z "$ANDROID_HOME" ]; then
+            echo "ANDROID_HOME=/usr/local/lib/android/sdk" >> "$GITHUB_ENV"
+          fi
+          echo "SDK at ${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          ls "${ANDROID_HOME:-/usr/local/lib/android/sdk}" || true
+          yes | "${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null 2>&1 || true
 
       - name: Install dependencies
         run: npm ci
@@ -46,10 +56,36 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Upload APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: sc-step-reminder-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
+
+  release:
+    name: Attach APK to release
+    needs: apk
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download APK
+        uses: actions/download-artifact@v4
+        with:
+          name: sc-step-reminder-debug-apk
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app-debug.apk
+          name: SC Step Reminder ${{ github.ref_name }}
+          body: |
+            Installable Android build of SC · Step Reminder.
+
+            `app-debug.apk` is signed with the debug key — sideload it for testing
+            (Settings → "Install unknown apps"). Counts steps from the motion
+            sensor while the app is open and sends the daily nudge at your chosen
+            time.
+          draft: false
+          prerelease: false
