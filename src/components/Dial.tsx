@@ -23,35 +23,27 @@ export function Dial({ steps, goal, remaining, goalReached }: Props) {
     <div className="dial">
       <svg viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label={`${fmt(steps)} of ${fmt(goal)} steps`}>
         <defs>
-          <radialGradient id="face" cx="34%" cy="22%" r="82%">
-            <stop offset="0%" stopColor="#8a5d36" />
-            <stop offset="46%" stopColor="#6a4526" />
-            <stop offset="100%" stopColor="#3f2714" />
+          <radialGradient id="face" cx="38%" cy="26%" r="80%">
+            <stop offset="0%" stopColor="#77512e" />
+            <stop offset="55%" stopColor="#674328" />
+            <stop offset="100%" stopColor="#5a3a20" />
           </radialGradient>
-          <radialGradient id="recess" cx="42%" cy="26%" r="76%">
-            <stop offset="0%" stopColor="#2f2013" />
-            <stop offset="62%" stopColor="#241809" />
-            <stop offset="100%" stopColor="#1b1108" />
+          <radialGradient id="recess" cx="46%" cy="30%" r="78%">
+            <stop offset="0%" stopColor="#261a0e" />
+            <stop offset="100%" stopColor="#201509" />
           </radialGradient>
           <linearGradient id="threadArc" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#f3e3c6" />
-            <stop offset="55%" stopColor="#d9b98e" />
-            <stop offset="100%" stopColor="#c69a65" />
+            <stop offset="0%" stopColor="#eadcbe" />
+            <stop offset="100%" stopColor="#d3b183" />
           </linearGradient>
           <linearGradient id="threadArcDone" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#dce6c4" />
-            <stop offset="60%" stopColor="#a8c08a" />
-            <stop offset="100%" stopColor="#7f9a68" />
+            <stop offset="0%" stopColor="#cfdcb6" />
+            <stop offset="100%" stopColor="#93ac79" />
           </linearGradient>
-          <filter id="arcGlow" x="-40%" y="-40%" width="180%" height="180%">
-            <feDropShadow dx="0" dy="0" stdDeviation="5" floodColor={goalReached ? '#a8c08a' : '#d9b98e'} floodOpacity="0.42" />
-          </filter>
         </defs>
 
         {/* leather bezel */}
-        <circle cx={C} cy={C} r={146} fill="url(#face)" />
-        <circle cx={C} cy={C} r={145.4} fill="none" stroke="rgba(0,0,0,0.45)" strokeWidth="1.2" />
-        <circle cx={C} cy={C} r={142} fill="none" stroke="rgba(255,236,204,0.16)" strokeWidth="1" />
+        <circle cx={C} cy={C} r={146} fill="url(#face)" stroke="rgba(0,0,0,0.4)" strokeWidth="1.2" />
 
         {/* saddle stitches around the rim */}
         <circle
@@ -67,9 +59,7 @@ export function Dial({ steps, goal, remaining, goalReached }: Props) {
         />
 
         {/* inner felt recess with rim shadow */}
-        <circle cx={C} cy={C} r={126} fill="url(#recess)" />
-        <circle cx={C} cy={C} r={126} fill="none" stroke="rgba(0,0,0,0.55)" strokeWidth="2.5" />
-        <circle cx={C} cy={C} r={123.4} fill="none" stroke="rgba(255,232,196,0.09)" strokeWidth="1.4" />
+        <circle cx={C} cy={C} r={126} fill="url(#recess)" stroke="rgba(0,0,0,0.4)" strokeWidth="1.4" />
 
         {/* minute ticks */}
         <g opacity="0.5">
@@ -99,17 +89,9 @@ export function Dial({ steps, goal, remaining, goalReached }: Props) {
           cy={C}
           r={ARC_R}
           fill="none"
-          stroke="rgba(0,0,0,0.45)"
-          strokeWidth={13}
-          strokeLinecap="round"
-        />
-        <circle
-          cx={C}
-          cy={C}
-          r={ARC_R}
-          fill="none"
-          stroke="rgba(255,236,204,0.07)"
+          stroke="rgba(0,0,0,0.32)"
           strokeWidth={11}
+          strokeLinecap="round"
         />
 
         {/* progress thread */}
@@ -124,20 +106,16 @@ export function Dial({ steps, goal, remaining, goalReached }: Props) {
           strokeDasharray={`${CIRC}`}
           strokeDashoffset={CIRC * (1 - progress)}
           transform={`rotate(-90 ${C} ${C})`}
-          filter="url(#arcGlow)"
           style={{ transition: 'stroke-dashoffset 700ms cubic-bezier(.22,.8,.2,1)' }}
         />
 
         {/* thread tail bead */}
         {progress > 0.004 && (
-          <g style={{ transition: 'transform 700ms cubic-bezier(.22,.8,.2,1)' }}>
-            <circle cx={tipX} cy={tipY} r={6.4} fill="#f6e8cd" opacity="0.92" />
-            <circle cx={tipX} cy={tipY} r={3} fill="#a6814f" opacity="0.85" />
-          </g>
+          <circle cx={tipX} cy={tipY} r={4.6} fill="#f0e2c6" />
         )}
 
         {/* start notch */}
-        <circle cx={C} cy={C - ARC_R} r={3.2} fill="rgba(241,228,204,0.35)" />
+        <circle cx={C} cy={C - ARC_R} r={2.8} fill="rgba(241,228,204,0.28)" />
       </svg>
 
       <div className="dial-center">
