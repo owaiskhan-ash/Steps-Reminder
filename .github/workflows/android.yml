@@ -74,9 +74,14 @@ jobs:
           echo "Using build-tools $BT"
           "$ANDROID_HOME/build-tools/$BT/apksigner" verify --print-certs "$APK" > /tmp/certs.txt
           cat /tmp/certs.txt
-          grep -qi "17:12:b8:6b:8c:1e:3f:47:de:60:cc:ce:65:f6:00:d3:b4:0f:1d:46:34:41:60:cb:01:34:ea:22:6f:6b:77:13" /tmp/certs.txt \
-            && echo "Signed with the project release key" \
-            || (echo "::error::APK is not signed with the project release key" && exit 1)
+          # apksigner prints digests without separators; normalise before comparing.
+          fp=$(tr -d ': \n' < /tmp/certs.txt | tr 'A-Z' 'a-z' | grep -o '1712b86b8c1e3f47de60ccce65f600d3b40f1d46344160cb0134ea226f6b7713' || true)
+          if [ "$fp" = "1712b86b8c1e3f47de60ccce65f600d3b40f1d46344160cb0134ea226f6b7713" ]; then
+            echo "Signed with the project release key ✓"
+          else
+            echo "::error::APK is not signed with the project release key"
+            exit 1
+          fi
           VERSION=$(grep -oE 'versionName "[^"]+"' app/build.gradle | head -1 | cut -d'"' -f2)
           echo "APK_VERSION=$VERSION" >> "$GITHUB_ENV"
           cp "$APK" "app/build/outputs/apk/release/SC-Step-Reminder-${VERSION}.apk"
