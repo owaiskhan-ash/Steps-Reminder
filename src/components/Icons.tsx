@@ -27,12 +27,12 @@ export const Bell = ({ size = 18, className, style }: P) => (
   </svg>
 )
 
+/** Two staggered footprints — legible down to ~14px. */
 export const Footsteps = ({ size = 20, className, style }: P) => (
   <svg {...base(size)} className={className} style={style}>
-    <path d="M6.5 21c-1.4 0-2.4-1.1-2.4-2.6 0-2.2 1.1-3.3 1.1-5.4 0-1.4.6-2.4.6-4.2C5.8 6.3 6.9 4 9 4s3 2 3 4.2c0 2-.5 3-.5 4.4 0 2.2 1 3.2 1 5.3 0 1.7-1 3.1-2.6 3.1H6.5Z" />
-    <path d="M17 13.4c1.2 0 2 .9 2 2.1 0 1.6-.8 2.4-.8 3.9 0 1-.5 1.7-.5 2.3 0 .8.4 1.3 1.3 1.3" opacity=".55" />
-    <circle cx="15.6" cy="7.4" r="1.4" opacity=".55" />
-    <circle cx="18.4" cy="9.6" r="1.2" opacity=".55" />
+    <path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z" />
+    <path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z" />
+    <path d="M16 17h4M4 13h4" opacity=".7" />
   </svg>
 )
 
