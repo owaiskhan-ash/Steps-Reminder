@@ -15,15 +15,25 @@ import {
 import type { AppState } from '../lib/storage'
 import { todayKey } from '../lib/storage'
 import type { TrackerStatus } from '../lib/useStepTracker'
+import type { StepSource } from '../lib/nativeSteps'
 
 type Props = {
   state: AppState
   steps: number
   trackerStatus: TrackerStatus
+  stepSource: StepSource
+  sourceReason: string
   onOpenSettings: () => void
 }
 
-export function Today({ state, steps, trackerStatus, onOpenSettings }: Props) {
+export function Today({
+  state,
+  steps,
+  trackerStatus,
+  stepSource,
+  sourceReason,
+  onOpenSettings,
+}: Props) {
   const goal = state.goal
   const remaining = Math.max(0, goal - steps)
   const goalReached = steps >= goal
@@ -33,13 +43,15 @@ export function Today({ state, steps, trackerStatus, onOpenSettings }: Props) {
   const days = lastSevenDays(state)
 
   const statusLabel =
-    trackerStatus === 'running'
-      ? 'Recording'
-      : trackerStatus === 'requesting'
-        ? 'Starting'
-        : trackerStatus === 'denied'
-          ? 'Sensor off'
-          : 'Idle'
+    stepSource === 'hardware'
+      ? 'Pedometer'
+      : stepSource === 'motion'
+        ? 'Experimental'
+        : stepSource === 'none' && !!sourceReason
+          ? 'No sensor'
+          : trackerStatus === 'requesting'
+            ? 'Starting'
+            : 'Idle'
 
   return (
     <div className="screen">
@@ -116,12 +128,24 @@ export function Today({ state, steps, trackerStatus, onOpenSettings }: Props) {
           </div>
         </div>
 
-        <div className="dial-reminder">
-          <Bell size={11} />
-          <span>
-            Reminder {prettyTime(state.reminderTime)} · in {humanGap(mins)}
-          </span>
-        </div>
+        {stepSource === 'none' && !!sourceReason ? (
+          <button className="dial-alert" onClick={onOpenSettings}>
+            <span>{sourceReason}</span>
+            <span className="dial-alert-cta">Tune</span>
+          </button>
+        ) : stepSource === 'motion' ? (
+          <button className="dial-alert" onClick={onOpenSettings}>
+            <span>Experimental motion counting — gestures can add steps.</span>
+            <span className="dial-alert-cta">Tune</span>
+          </button>
+        ) : (
+          <div className="dial-reminder">
+            <Bell size={11} />
+            <span>
+              Reminder {prettyTime(state.reminderTime)} · in {humanGap(mins)}
+            </span>
+          </div>
+        )}
       </section>
 
       <section className="card card--felt">

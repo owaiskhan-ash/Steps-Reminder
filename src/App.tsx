@@ -69,6 +69,7 @@ export default function App() {
   const tracker = useStepTracker({
     enabled: sensorOn,
     sensitivity: state.sensitivity,
+    experimentalMotion: state.experimentalMotion,
     onStep: () => addSteps(1),
   })
 
@@ -192,6 +193,8 @@ export default function App() {
             state={state}
             steps={steps}
             trackerStatus={tracker.status}
+            stepSource={tracker.source}
+            sourceReason={tracker.reason}
             onOpenSettings={() => setTab('settings')}
           />
         )}
@@ -204,6 +207,12 @@ export default function App() {
             trackerStatus={tracker.status}
             trackerDetail={tracker.detail}
             diagnostics={tracker.diagnostics}
+            stepSource={tracker.source}
+            sourceReason={tracker.reason}
+            onExperimental={(on) =>
+              setState((prev) => ({ ...prev, experimentalMotion: on }))
+            }
+            onLogSteps={(n) => addSteps(n)}
             onGoal={setGoal}
             onTime={setReminderTime}
             onSensitivity={(n) => setState((prev) => ({ ...prev, sensitivity: n }))}

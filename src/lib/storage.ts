@@ -8,7 +8,9 @@ export type AppState = {
   goal: number
   reminderTime: string // "HH:MM" 24h
   strideMeters: number
-  sensitivity: number // 1 (light) .. 5 (firm)
+  sensitivity: number // 1 (strict) .. 5 (loose)
+  /** Opt-in accelerometer counting. Off by default: gestures can add steps. */
+  experimentalMotion: boolean
   days: Record<string, DayRecord>
   seeded: boolean
 }
@@ -21,6 +23,7 @@ export const DEFAULT_STATE: AppState = {
   reminderTime: '20:00',
   strideMeters: 0.72,
   sensitivity: 2,
+  experimentalMotion: false,
   days: {},
   seeded: false,
 }

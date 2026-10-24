@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { StepDetector, type DetectorDiagnostics } from './pedometer'
 import { isNative } from './notify'
-import { startNativeSteps } from './nativeSteps'
+import { probeNativeSteps, startNativeSteps, type StepSource } from './nativeSteps'
 
 export type TrackerStatus = 'idle' | 'requesting' | 'running' | 'denied' | 'unsupported'
 
@@ -10,6 +10,8 @@ export type { DetectorDiagnostics }
 type Options = {
   enabled: boolean
   sensitivity: number
+  /** Off by default. Gesture-prone, so only used when the user asks for it. */
+  experimentalMotion: boolean
   onStep: () => void
 }
 
@@ -21,9 +23,16 @@ type MotionEventCtor = {
  * Subscribes to raw motion. Uses the native Capacitor Motion plugin on a device
  * and window `devicemotion` in the browser.
  */
-export function useStepTracker({ enabled, sensitivity, onStep }: Options) {
+export function useStepTracker({
+  enabled,
+  sensitivity,
+  experimentalMotion,
+  onStep,
+}: Options) {
   const [status, setStatus] = useState<TrackerStatus>('idle')
   const [detail, setDetail] = useState<string>('')
+  const [source, setSource] = useState<StepSource>('none')
+  const [reason, setReason] = useState<string>('')
   const [diagnostics, setDiagnostics] = useState<DetectorDiagnostics | null>(null)
   const detector = useRef<StepDetector | null>(null)
   const onStepRef = useRef(onStep)
@@ -88,27 +97,44 @@ export function useStepTracker({ enabled, sensitivity, onStep }: Options) {
       setStatus('requesting')
       setDetail('')
 
-      // Best path first: the hardware pedometer. Android's own motion
-      // classifier ignores hand swinging and shaking, so this can't over-count.
+      // The hardware pedometer is the ONLY default source: Android's own motion
+      // classifier ignores hand swinging, shaking and rotating, so gestures
+      // cannot create steps. If it is unavailable we say so and count nothing
+      // rather than quietly switching to the gesture-prone detector.
       if (isNative()) {
-        try {
-          const native = await startNativeSteps(() => onStepRef.current())
-          if (cancelled) {
-            await native?.stop()
-            return
-          }
-          if (native) {
-            setStatus('running')
-            setDetail(native.kind === 'detector' ? 'Hardware pedometer' : 'Hardware step counter')
-            stopRef.current = () => {
-              void native.stop()
-            }
-            return
-          }
-        } catch {
-          /* fall through to the accelerometer */
+        const native = await startNativeSteps(() => onStepRef.current())
+        if (cancelled) {
+          if (native.ok) await native.stop()
+          return
         }
+        if (native.ok) {
+          setSource('hardware')
+          setReason('')
+          setStatus('running')
+          setDetail(native.kind === 'detector' ? 'Hardware pedometer' : 'Hardware step counter')
+          stopRef.current = () => {
+            void native.stop()
+          }
+          return
+        }
+        setReason(native.reason)
+        setSource('none')
+        setStatus('unsupported')
+        setDetail(native.reason)
+        if (!experimentalMotion) return
+      } else if (!experimentalMotion) {
+        // Browser: nothing to count with unless motion counting is enabled.
+        const probe = await probeNativeSteps()
+        const why = probe.ok ? 'Web build — no step sensor.' : probe.reason
+        setReason(why)
+        setSource('none')
+        setStatus('unsupported')
+        setDetail(why)
+        return
       }
+
+      setSource('motion')
+      setReason('Experimental motion counting — gestures can add steps.')
 
       // Native/accelerometer path — Capacitor Motion wraps the WebView sensor APIs
       // and handles the iOS permission prompt. A watchdog falls back to raw
@@ -191,9 +217,9 @@ export function useStepTracker({ enabled, sensitivity, onStep }: Options) {
       detector.current?.reset()
       setStatus('idle')
     }
-  }, [enabled, stop])
+  }, [enabled, stop, experimentalMotion])
 
-  return { status, detail, diagnostics, stop }
+  return { status, detail, diagnostics, source, reason, stop }
 }
 
 /** Desktop/demo helper: walks a plausible cadence so the UI can be seen working. */

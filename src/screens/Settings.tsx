@@ -3,6 +3,7 @@ import { Stitch } from '../components/Stitch'
 import { Modal } from '../components/Modal'
 import { Bell, Clock, Footsteps, House, Play, Ruler, Pause } from '../components/Icons'
 import type { DetectorDiagnostics, TrackerStatus } from '../lib/useStepTracker'
+import type { StepSource } from '../lib/nativeSteps'
 import { fmt, minutesUntil, prettyTime } from '../lib/format'
 import type { AppState } from '../lib/storage'
 import { testNotification } from '../lib/notify'
@@ -14,6 +15,10 @@ type Props = {
   trackerStatus: TrackerStatus
   trackerDetail: string
   diagnostics: DetectorDiagnostics | null
+  stepSource: StepSource
+  sourceReason: string
+  onExperimental: (on: boolean) => void
+  onLogSteps: (n: number) => void
   onGoal: (goal: number) => void
   onTime: (time: string) => void
   onSensitivity: (n: number) => void
@@ -33,6 +38,10 @@ export function Settings({
   trackerStatus,
   trackerDetail,
   diagnostics,
+  stepSource,
+  sourceReason,
+  onExperimental,
+  onLogSteps,
   onGoal,
   onTime,
   onSensitivity,
@@ -135,9 +144,27 @@ export function Settings({
 
       <section className="card card--suede">
         <Stitch inset={6} radius={16} color="rgba(74,45,22,.7)" opacity={0.6} />
-        <div className="field-label">
+        <div className="settings-row" style={{ paddingTop: 0, borderColor: 'rgba(74,45,22,.18)' }}>
+          <div>
+            <div className="settings-row-title">Count steps with motion sensor</div>
+            <div className="settings-row-sub">
+              {stepSource === 'hardware'
+                ? 'Not needed — the hardware pedometer is counting and cannot be fooled by gestures.'
+                : 'Uses the accelerometer and gyroscope. Rotating or swinging the phone can still add steps.'}
+            </div>
+          </div>
+          <button
+            className={`switch ${state.experimentalMotion ? 'switch--on' : ''}`}
+            onClick={() => onExperimental(!state.experimentalMotion)}
+            aria-pressed={state.experimentalMotion}
+            aria-label="Count steps with motion sensor"
+            disabled={stepSource === 'hardware'}
+            style={stepSource === 'hardware' ? { opacity: 0.45 } : undefined}
+          />
+        </div>
+        <div className="field-label" style={{ marginTop: 14 }}>
           <span className="label" style={{ color: 'rgba(20,11,7,.6)' }}>
-            Step detection
+            Detection strictness
           </span>
           <span className="field-value" style={{ color: '#140b07' }}>
             {SENSITIVITY_LABELS[Math.min(4, Math.max(0, state.sensitivity - 1))]}
@@ -188,6 +215,17 @@ export function Settings({
         <Stitch inset={6} radius={16} opacity={0.34} />
         <div className="label">Detector diagnostics</div>
         <div className="diag-grid">
+          <DiagRow
+            label="Source"
+            value={
+              stepSource === 'hardware'
+                ? 'Hardware pedometer'
+                : stepSource === 'motion'
+                  ? 'Motion sensor (experimental)'
+                  : 'None'
+            }
+            warn={stepSource === 'motion'}
+          />
           <DiagRow label="Sensor" value={trackerDetail || 'starting…'} />
           <DiagRow
             label="Status"
@@ -243,16 +281,40 @@ export function Settings({
             }
           />
         </div>
-        <p className="hint" style={{ marginTop: 12 }}>
-          Walk a few paces and this should read “counting”. Rotate, swing or shake the phone and
-          watch Rotation cross its limit, or the Impulse line give way — either one is enough to
-          reject a step.
-        </p>
+        {stepSource === 'none' && sourceReason ? (
+          <p className="hint" style={{ marginTop: 12 }}>
+            Why nothing is counting: {sourceReason} Nothing is being counted rather than guessing
+            from motion — switch on the motion sensor above if you want counting anyway.
+          </p>
+        ) : (
+          <p className="hint" style={{ marginTop: 12 }}>
+            Walk a few paces and this should read “counting”. Rotate, swing or shake the phone and
+            watch Rotation cross its limit, or the Impulse line give way.
+          </p>
+        )}
       </section>
 
       <section className="card card--felt">
         <Stitch inset={6} radius={16} opacity={0.3} />
         <div className="settings-row" style={{ paddingTop: 0 }}>
+          <div>
+            <div className="settings-row-title">Log steps by hand</div>
+            <div className="settings-row-sub">For days the phone stayed in a drawer.</div>
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {[100, 500].map((n) => (
+              <button
+                key={n}
+                className="btn btn--felt"
+                onClick={() => onLogSteps(n)}
+                style={{ padding: '10px 11px', flex: 'none' }}
+              >
+                +{n}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="settings-row">
           <div>
             <div className="settings-row-title">Demo walk</div>
             <div className="settings-row-sub">
@@ -288,7 +350,7 @@ export function Settings({
           <div>
             <div className="settings-row-title">SC · Step Reminder</div>
             <div className="settings-row-sub">
-              Version 1.2.0 · leather, felt and suede · made quietly
+              Version 1.2.1 · leather, felt and suede · made quietly
             </div>
           </div>
         </div>

@@ -14,11 +14,15 @@ slipping away short of your mark, it says so in plain words:
 
 - **First run asks two things** — your daily step target (2,000–20,000, with presets) and your
   reminder time. Nothing else.
-- **Hardware pedometer first.** On Android the app reads `TYPE_STEP_DETECTOR` /
+- **Hardware pedometer only, by default.** On Android the app reads `TYPE_STEP_DETECTOR` /
   `TYPE_STEP_COUNTER` through a small native plugin (`StepCounterPlugin`), so counting is done by
   the platform's motion classifier with the `ACTIVITY_RECOGNITION` permission — hand swinging and
   shaking simply do not register, and battery use is far lower than sampling motion.
-- **Accelerometer fallback** for devices (or browsers) without a step sensor, with five gates: world-frame
+- **No silent fallback.** If the hardware pedometer is unavailable (no sensor, permission blocked,
+  plugin error) the app says so on the Today screen and counts **nothing**, rather than quietly
+  switching to the gesture-prone detector.
+- **Motion counting is opt-in.** *Tune → Count steps with motion sensor* enables the accelerometer
+  path for devices without a step sensor, with five gates: world-frame
   gravity projection, a **gyroscope gate** (walking rocks the phone gently; arm swinging, figure-8s and
   revolutions exceed the angular limit and are discarded), cadence, impact-shaped waveform, and a
   **sustained-walk requirement** (nothing is credited until 8 consecutive valid footfalls confirm you are

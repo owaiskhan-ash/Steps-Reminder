@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "SC — Step Reminder. A leather-craft step counter with daily goals and gentle reminders.",
+  "description": "SC \u2014 Step Reminder. A leather-craft step counter with daily goals and gentle reminders.",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
@@ -12,7 +12,9 @@
     "cap:sync": "npm run build && npx cap sync android",
     "apk": "npm run apk:release",
     "apk:debug": "npm run cap:sync && cd android && ./gradlew assembleDebug",
-    "apk:release": "npm run cap:sync && cd android && ./gradlew assembleRelease"
+    "apk:release": "npm run cap:sync && cd android && ./gradlew assembleRelease",
+    "test:steps": "node --experimental-strip-types scripts/test-pedometer.mjs",
+    "test": "npm run test:steps"
   },
   "dependencies": {
     "@capacitor/core": "^7.0.0",
