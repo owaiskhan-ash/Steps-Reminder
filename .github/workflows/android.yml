@@ -54,7 +54,17 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          set +e
+          ./gradlew assembleDebug --no-daemon --console=plain --stacktrace 2>&1 | tee /tmp/gradle.log
+          status=${PIPESTATUS[0]}
+          if [ "$status" -ne 0 ]; then
+            # Surface the useful lines as annotations so the failure is readable
+            # from the checks API without downloading the full log.
+            grep -nE "^e: |error:|FAILURE:|What went wrong|Caused by:|^> |Unsupported|not found|SDK" /tmp/gradle.log | tail -n 25 | while IFS= read -r line; do
+              echo "::error::${line}"
+            done
+          fi
+          exit "$status"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
