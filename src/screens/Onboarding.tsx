@@ -24,13 +24,7 @@ export function Onboarding({ initialGoal, initialTime, onComplete }: Props) {
     setNotifyState(ok ? 'granted' : 'denied')
   }
 
-  const finishTime = (value: string) => {
-    setTime(value)
-    const [h] = value.split(':').map(Number)
-    if (!Number.isNaN(h)) {
-      // a reminder before noon reads like a morning nudge — keep it as chosen
-    }
-  }
+  const finishTime = (value: string) => setTime(value)
 
   return (
     <div className="screen onboard">

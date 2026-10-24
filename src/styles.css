@@ -62,6 +62,7 @@ input {
 /* ---------------------------------------------------------------- shell --- */
 
 .stage {
+  min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   justify-content: center;
@@ -72,6 +73,7 @@ input {
   position: relative;
   width: 100%;
   max-width: 452px;
+  min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
@@ -382,6 +384,7 @@ input {
 .dial-center {
   position: absolute;
   inset: 0;
+  padding: 0 17%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -391,6 +394,10 @@ input {
 }
 
 .dial-steps {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: clip;
+  white-space: nowrap;
   font-family: var(--font-display);
   font-variant-numeric: tabular-nums;
   font-size: clamp(44px, 13vw, 58px);
@@ -755,7 +762,7 @@ input {
 /* ------------------------------------------------------------ onboarding --- */
 
 .onboard {
-  min-height: 100dvh;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
