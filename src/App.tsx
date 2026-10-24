@@ -52,16 +52,19 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
 
-  /** Authoritative total from the phone: never lowers what is already stored. */
+  /** Authoritative total from the phone's counter. */
   const adoptTodaySteps = useCallback((n: number) => {
-    if (!Number.isFinite(n) || n <= 0) return
+    if (!Number.isFinite(n) || n < 0) return
     setState((prev) => {
       const key = todayKey()
       const current = prev.days[key]?.steps ?? 0
-      if (n <= current) return prev
+      const next = Math.round(n)
+      if (next === current) return prev
+      // Never let a transient zero wipe a day's recorded steps.
+      if (next === 0 && current > 0) return prev
       return {
         ...prev,
-        days: { ...prev.days, [key]: { steps: Math.round(n), goal: prev.goal } },
+        days: { ...prev.days, [key]: { steps: next, goal: prev.goal } },
       }
     })
   }, [])
@@ -189,6 +192,18 @@ export default function App() {
     pushToast('Reminder set', `We’ll check your steps at ${prettyTime(reminderTime)} each day.`)
   }
 
+  const syncNow = useCallback(async () => {
+    const result = await sync.sync()
+    if (result.ok) {
+      pushToast(
+        'Synced with the phone',
+        `${fmt(result.steps)} steps so far today, straight from the phone's step counter.`,
+      )
+    } else {
+      pushToast('Could not sync', result.reason)
+    }
+  }, [sync, pushToast])
+
   const reset = () => {
     clearState()
     setSensorOn(false)
@@ -233,6 +248,7 @@ export default function App() {
             stepSource={sync.source === 'pedometer' ? 'pedometer' : tracker.source}
             sourceReason={sync.source === 'pedometer' ? '' : sync.reason || tracker.reason}
             countedSince={sync.since}
+            onSync={syncNow}
             onOpenSettings={() => setTab('settings')}
           />
         )}
@@ -252,7 +268,7 @@ export default function App() {
             syncCounter={sync.counter}
             syncSince={sync.since}
             syncRebooted={sync.rebooted}
-            onSync={() => void sync.sync()}
+            onSync={syncNow}
             onExperimental={(on) =>
               setState((prev) => ({ ...prev, experimentalMotion: on }))
             }

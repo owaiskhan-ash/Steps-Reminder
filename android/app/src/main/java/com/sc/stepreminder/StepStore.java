@@ -10,6 +10,7 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.os.Build;
+import android.os.SystemClock;
 
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
@@ -82,15 +83,40 @@ final class StepStore {
         final float counter;
         final boolean rebooted;
         final boolean baselineStartedNow;
+        /** True when the counter itself only started today, so it IS today's total. */
+        final boolean fromBoot;
         final String since;
 
-        Today(int steps, float counter, boolean rebooted, boolean baselineStartedNow, String since) {
+        Today(
+            int steps,
+            float counter,
+            boolean rebooted,
+            boolean baselineStartedNow,
+            boolean fromBoot,
+            String since
+        ) {
             this.steps = steps;
             this.counter = counter;
             this.rebooted = rebooted;
             this.baselineStartedNow = baselineStartedNow;
+            this.fromBoot = fromBoot;
             this.since = since;
         }
+    }
+
+    /** Wall-clock time the phone booted. */
+    static long bootTimeMillis() {
+        return System.currentTimeMillis() - SystemClock.elapsedRealtime();
+    }
+
+    /** Start of today, in wall-clock millis. */
+    static long midnightMillis() {
+        Calendar midnight = Calendar.getInstance();
+        midnight.set(Calendar.HOUR_OF_DAY, 0);
+        midnight.set(Calendar.MINUTE, 0);
+        midnight.set(Calendar.SECOND, 0);
+        midnight.set(Calendar.MILLISECOND, 0);
+        return midnight.getTimeInMillis();
     }
 
     /**
@@ -107,7 +133,7 @@ final class StepStore {
         float lastValue = p.getFloat(KEY_LAST_VALUE, -1f);
 
         if (counter < 0) {
-            return new Today(0, counter, false, false, null);
+            return new Today(0, counter, false, false, false, null);
         }
 
         // Counter went backwards → the phone rebooted since the baseline.
@@ -116,17 +142,32 @@ final class StepStore {
 
         if (date.equals(baselineDate) && baseline >= 0 && !rebooted) {
             int steps = Math.max(0, Math.round(counter - baseline));
-            return new Today(steps, counter, false, false, null);
+            boolean fromBoot = baseline == 0f;
+            return new Today(steps, counter, false, false, fromBoot, null);
         }
 
-        // New day (or reboot): start from here.
+        // No baseline for today yet. If the phone booted after midnight, then
+        // every step in the counter happened today, so the counter itself is
+        // today's total — this is what the phone's own step card is showing.
+        boolean bootedToday = bootTimeMillis() >= midnightMillis();
+        if (bootedToday) {
+            p.edit()
+                .putString(KEY_BASELINE_DATE, date)
+                .putFloat(KEY_BASELINE_VALUE, 0f)
+                .putFloat(KEY_LAST_VALUE, counter)
+                .apply();
+            return new Today(Math.round(counter), counter, rebooted, false, true, null);
+        }
+
+        // Booted before today: steps from earlier days are mixed into the
+        // counter, so start counting from here rather than inventing a number.
         String now = new SimpleDateFormat("HH:mm", Locale.US).format(new Date());
         p.edit()
             .putString(KEY_BASELINE_DATE, date)
             .putFloat(KEY_BASELINE_VALUE, counter)
+            .putFloat(KEY_LAST_VALUE, counter)
             .apply();
-        int carried = rebooted ? Math.round(Math.max(0, counter)) : 0;
-        return new Today(carried, counter, rebooted, true, now);
+        return new Today(0, counter, rebooted, true, false, now);
     }
 
     /**

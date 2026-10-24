@@ -11,7 +11,10 @@ export type PedometerReading = {
   available: boolean
   rebooted: boolean
   baselineStartedNow: boolean
+  /** The counter only started today, so it is already today's total. */
+  fromBoot: boolean
   since?: string
+  reason?: string
   /** Daily totals banked by the midnight alarm: { "2026-10-23": 8342 } */
   history?: Record<string, number>
   permission?: 'granted' | 'denied' | 'prompt'
@@ -57,7 +60,10 @@ export async function readPedometer(): Promise<
       }
     }
     if (!reading.available) {
-      return { ok: false, reason: 'The step counter returned no reading.' }
+      return {
+        ok: false,
+        reason: reading.reason ?? 'The step counter returned no reading.',
+      }
     }
     return { ok: true, reading }
   } catch (error) {

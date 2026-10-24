@@ -10,6 +10,7 @@ export type SyncState = {
   since: string | null
   lastSync: number | null
   rebooted: boolean
+  fromBoot: boolean
 }
 
 const POLL_MS = 12000
@@ -40,6 +41,7 @@ export function useStepSync({
     since: null,
     lastSync: null,
     rebooted: false,
+    fromBoot: false,
   })
 
   const onTodayRef = useRef(onTodaySteps)
@@ -47,7 +49,9 @@ export function useStepSync({
   onTodayRef.current = onTodaySteps
   onHistoryRef.current = onHistory
 
-  const sync = useCallback(async () => {
+  const sync = useCallback(async (): Promise<
+    { ok: true; steps: number } | { ok: false; reason: string }
+  > => {
     const result = await readPedometer()
     if (!result.ok) {
       setState((prev) => ({
@@ -56,7 +60,7 @@ export function useStepSync({
         label: 'No step counter',
         reason: result.reason,
       }))
-      return
+      return { ok: false, reason: result.reason }
     }
 
     const { reading } = result
@@ -71,7 +75,9 @@ export function useStepSync({
       since: reading.baselineStartedNow ? reading.since ?? null : null,
       lastSync: Date.now(),
       rebooted: reading.rebooted,
+      fromBoot: reading.fromBoot,
     })
+    return { ok: true, steps: reading.steps }
   }, [])
 
   useEffect(() => {

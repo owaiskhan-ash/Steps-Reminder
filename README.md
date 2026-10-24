@@ -18,6 +18,10 @@ slipping away short of your mark, it says so in plain words:
   total the OS keeps while the app is closed — resolved against a persisted midnight baseline. Open
   the app at any hour and you see the day's real total, including steps taken when it wasn't running.
   No login, no Google Fit, no Health Connect, no cloud.
+- **Today's total from the first read.** If the phone booted after midnight, every step in the
+  counter happened today, so the counter *is* today's total — the app reports the same number your
+  phone shows, no baseline guesswork. If the phone booted before today, the older steps can't be
+  attributed, so counting starts honestly from "since HH:MM".
 - **History builds itself.** A midnight alarm banks the finished day's total, so a week of data
   appears even if you never open the app. A boot receiver re-arms it after a restart, and counter
   resets are detected rather than producing nonsense.

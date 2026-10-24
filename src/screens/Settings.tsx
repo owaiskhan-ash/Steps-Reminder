@@ -387,7 +387,7 @@ export function Settings({
           <div>
             <div className="settings-row-title">SC · Step Reminder</div>
             <div className="settings-row-sub">
-              Version 1.3.0 · leather, felt and suede · made quietly
+              Version 1.3.1 · leather, felt and suede · made quietly
             </div>
           </div>
         </div>

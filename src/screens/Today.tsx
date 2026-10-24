@@ -25,6 +25,7 @@ type Props = {
   sourceReason: string
   /** Set when today's count began mid-day (e.g. app first opened at 14:03). */
   countedSince: string | null
+  onSync: () => void
   onOpenSettings: () => void
 }
 
@@ -35,6 +36,7 @@ export function Today({
   stepSource,
   sourceReason,
   countedSince,
+  onSync,
   onOpenSettings,
 }: Props) {
   const goal = state.goal
@@ -148,9 +150,14 @@ export function Today({
               {stepSource === 'pedometer'
                 ? countedSince
                   ? `Counting since ${countedSince} · reminder ${prettyTime(state.reminderTime)}`
-                  : `From the phone’s step counter · reminder ${prettyTime(state.reminderTime)}`
+                  : `Phone step counter · reminder ${prettyTime(state.reminderTime)}`
                 : `Reminder ${prettyTime(state.reminderTime)} · in ${humanGap(mins)}`}
             </span>
+            {stepSource === 'pedometer' && (
+              <button className="dial-sync" onClick={onSync}>
+                Sync
+              </button>
+            )}
           </div>
         )}
       </section>

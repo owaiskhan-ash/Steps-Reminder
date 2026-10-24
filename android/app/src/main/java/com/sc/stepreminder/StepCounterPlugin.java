@@ -50,6 +50,14 @@ public class StepCounterPlugin extends Plugin implements SensorEventListener {
         stepDetector = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR);
         // Keep the midnight rollover armed whenever the plugin loads.
         StepStore.scheduleMidnight(getContext());
+
+        // Listen to the cumulative counter permanently. It is extremely low
+        // power, and it means a reading is always available instantly — a
+        // one-shot read can otherwise time out on devices that only report the
+        // counter when a step occurs.
+        if (stepCounter != null) {
+            sensorManager.registerListener(this, stepCounter, SensorManager.SENSOR_DELAY_NORMAL);
+        }
     }
 
     @Override
@@ -104,11 +112,17 @@ public class StepCounterPlugin extends Plugin implements SensorEventListener {
     private void resolveToday(PluginCall call) {
         final android.content.Context context = getContext();
         new Thread(() -> {
-            float counter = StepStore.readCounter(context, 2500);
+            float counter = StepStore.readCounter(context, 1500);
+            // Fall back to the continuously-updated value rather than failing.
+            if (counter < 0) counter = latestCounter;
             JSObject result = new JSObject();
             if (counter < 0) {
                 result.put("steps", 0);
                 result.put("available", false);
+                result.put(
+                    "reason",
+                    "The step counter hasn't reported yet. Take a few steps, then sync again."
+                );
                 call.resolve(result);
                 return;
             }
@@ -118,6 +132,7 @@ public class StepCounterPlugin extends Plugin implements SensorEventListener {
             result.put("counter", today.counter);
             result.put("rebooted", today.rebooted);
             result.put("baselineStartedNow", today.baselineStartedNow);
+            result.put("fromBoot", today.fromBoot);
             if (today.since != null) result.put("since", today.since);
             result.put("available", true);
             result.put("history", StepStore.historyJson(context));
