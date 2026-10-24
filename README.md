@@ -50,7 +50,14 @@ On a desktop browser there is no accelerometer, so use **Demo walk** on the Toda
 the dial, stats and reminder copy work in real time. On a phone, **Start sensor** asks for motion
 access and counts for real.
 
-## Android APK
+## Get the APK
+
+**[Download the latest APK →](https://github.com/owaiskhan-ash/Steps-Reminder/releases/latest)**
+
+Sideload it (Settings → install unknown apps). It is signed with the debug key, so it is meant for
+testing rather than the Play Store.
+
+## Build the APK yourself
 
 The Android project is already generated (`android/`, Capacitor 7, application id
 `com.sc.stepreminder`).
