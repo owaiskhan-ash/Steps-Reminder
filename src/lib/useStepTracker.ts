@@ -194,29 +194,3 @@ export function useStepTracker({
 
   return { status, detail, diagnostics, source, reason, stop }
 }
-
-/** Desktop/demo helper: walks a plausible cadence so the UI can be seen working. */
-export function useSimulator(active: boolean, onSteps: (n: number) => void) {
-  const cb = useRef(onSteps)
-  cb.current = onSteps
-  useEffect(() => {
-    if (!active) return
-    let alive = true
-    let carry = 0
-    const tick = () => {
-      if (!alive) return
-      const cadence = 1.4 + Math.random() * 1.6 // steps per second
-      carry += cadence * 0.5
-      const whole = Math.floor(carry)
-      if (whole > 0) {
-        carry -= whole
-        cb.current(whole)
-      }
-    }
-    const id = window.setInterval(tick, 500)
-    return () => {
-      alive = false
-      window.clearInterval(id)
-    }
-  }, [active])
-}

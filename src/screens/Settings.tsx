@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { Stitch } from '../components/Stitch'
 import { Modal } from '../components/Modal'
-import { Bell, Clock, Footsteps, House, Play, Ruler, Pause } from '../components/Icons'
-import type { DetectorDiagnostics, TrackerStatus } from '../lib/useStepTracker'
+import { Bell, Clock, Footsteps, House, Ruler } from '../components/Icons'
 import type { StepSource } from '../lib/nativeSteps'
 import { fmt, minutesUntil, prettyTime } from '../lib/format'
 import type { AppState } from '../lib/storage'
@@ -11,25 +10,15 @@ import { testNotification } from '../lib/notify'
 type Props = {
   state: AppState
   steps: number
-  simulating: boolean
-  trackerStatus: TrackerStatus
-  trackerDetail: string
-  diagnostics: DetectorDiagnostics | null
   stepSource: StepSource
-  sourceReason: string
   syncLabel: string
-  syncLast: number | null
-  syncCounter: number | null
-  syncSince: string | null
-  syncRebooted: boolean
+  sourceReason: string
   onSync: () => void
   onExperimental: (on: boolean) => void
-  onLogSteps: (n: number) => void
   onGoal: (goal: number) => void
   onTime: (time: string) => void
   onSensitivity: (n: number) => void
   onStride: (n: number) => void
-  onToggleSim: () => void
   onReset: () => void
   onGoHome: () => void
   onToast: (title: string, body: string) => void
@@ -40,25 +29,15 @@ const SENSITIVITY_LABELS = ['Strictest', 'Strict', 'Balanced', 'Loose', 'Loosest
 export function Settings({
   state,
   steps,
-  simulating,
-  trackerStatus,
-  trackerDetail,
-  diagnostics,
   stepSource,
   sourceReason,
   syncLabel,
-  syncLast,
-  syncCounter,
-  syncSince,
-  syncRebooted,
   onSync,
   onExperimental,
-  onLogSteps,
   onGoal,
   onTime,
   onSensitivity,
   onStride,
-  onToggleSim,
   onReset,
   onGoHome,
   onToast,
@@ -239,135 +218,7 @@ export function Settings({
       </section>
 
       <section className="card card--felt">
-        <Stitch inset={6} radius={16} opacity={0.34} />
-        <div className="label">Detector diagnostics</div>
-        <div className="diag-grid">
-          <DiagRow
-            label="Source"
-            value={
-              stepSource === 'pedometer'
-                ? 'Phone step counter'
-                : stepSource === 'motion'
-                  ? 'Motion sensor (experimental)'
-                  : 'None'
-            }
-            warn={stepSource === 'motion'}
-          />
-          <DiagRow
-            label="Counter"
-            value={syncCounter != null ? `${Math.round(syncCounter).toLocaleString()} since boot` : '—'}
-          />
-          <DiagRow
-            label="Last sync"
-            value={syncLast ? new Date(syncLast).toLocaleTimeString() : '—'}
-          />
-          <DiagRow label="Day started" value={syncSince ? `${syncSince} (mid-day)` : 'Midnight'} />
-          {syncRebooted && <DiagRow label="Note" value="Phone rebooted — counter restarted" warn />}
-          <DiagRow label="Sensor" value={trackerDetail || 'starting…'} />
-          <DiagRow
-            label="Status"
-            value={
-              trackerStatus === 'running'
-                ? 'listening'
-                : trackerStatus === 'requesting'
-                  ? 'starting'
-                  : trackerStatus
-            }
-          />
-          <DiagRow
-            label="Gyroscope"
-            value={diagnostics ? (diagnostics.hasGyro ? 'active' : 'unavailable') : '—'}
-          />
-          <DiagRow
-            label="Rotation"
-            value={
-              diagnostics
-                ? `${(diagnostics.angular * (180 / Math.PI)).toFixed(0)}°/s of ${(diagnostics.angularLimit * (180 / Math.PI)).toFixed(0)}`
-                : '—'
-            }
-            warn={!!diagnostics && diagnostics.angular > diagnostics.angularLimit * 0.75}
-          />
-          <DiagRow
-            label="Cadence"
-            value={diagnostics && diagnostics.cadence ? `${diagnostics.cadence} steps/min` : '—'}
-          />
-          <DiagRow
-            label="Impulse"
-            value={
-              diagnostics
-                ? `skew ${diagnostics.skew.toFixed(2)} · crest ${diagnostics.crest.toFixed(2)}`
-                : '—'
-            }
-            warn={!!diagnostics && diagnostics.skew < 0.2 && diagnostics.crest > 0}
-          />
-          <DiagRow
-            label="Walk run"
-            value={
-              diagnostics
-                ? `${diagnostics.sustain} / ${diagnostics.sustainNeeded} steps`
-                : '—'
-            }
-          />
-          <DiagRow label="Verdict" value={diagnostics?.lastReason ?? '—'} />
-          <DiagRow
-            label="Credited"
-            value={
-              diagnostics
-                ? `${diagnostics.accepted} counted · ${diagnostics.rejected} rejected`
-                : '—'
-            }
-          />
-        </div>
-        {stepSource === 'none' && sourceReason ? (
-          <p className="hint" style={{ marginTop: 12 }}>
-            Why nothing is counting: {sourceReason} Nothing is being counted rather than guessing
-            from motion — switch on the motion sensor above if you want counting anyway.
-          </p>
-        ) : (
-          <p className="hint" style={{ marginTop: 12 }}>
-            Walk a few paces and this should read “counting”. Rotate, swing or shake the phone and
-            watch Rotation cross its limit, or the Impulse line give way.
-          </p>
-        )}
-      </section>
-
-      <section className="card card--felt">
         <Stitch inset={6} radius={16} opacity={0.3} />
-        <div className="settings-row" style={{ paddingTop: 0 }}>
-          <div>
-            <div className="settings-row-title">Log steps by hand</div>
-            <div className="settings-row-sub">For days the phone stayed in a drawer.</div>
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {[100, 500].map((n) => (
-              <button
-                key={n}
-                className="btn btn--felt"
-                onClick={() => onLogSteps(n)}
-                style={{ padding: '10px 11px', flex: 'none' }}
-              >
-                +{n}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="settings-row">
-          <div>
-            <div className="settings-row-title">Demo walk</div>
-            <div className="settings-row-sub">
-              Adds steps at a walking pace so you can preview the dial. Real counting uses the
-              sensor.
-            </div>
-          </div>
-          <button
-            className="btn btn--felt"
-            onClick={onToggleSim}
-            style={{ padding: '10px 13px', flex: 'none' }}
-          >
-            {simulating ? <Pause size={13} /> : <Play size={13} />}
-            {simulating ? 'Stop' : 'Start'}
-          </button>
-        </div>
         <div className="settings-row">
           <div>
             <div className="settings-row-title">Reset everything</div>
@@ -387,7 +238,7 @@ export function Settings({
           <div>
             <div className="settings-row-title">SC · Step Reminder</div>
             <div className="settings-row-sub">
-              Version 1.3.1 · leather, felt and suede · made quietly
+              Version 1.3.5 · leather, felt and suede · made quietly
             </div>
           </div>
         </div>
@@ -415,23 +266,6 @@ export function Settings({
       <p className="footnote" style={{ marginTop: 'auto' }}>
         Reminders use local notifications. No account, no cloud, no tracking.
       </p>
-    </div>
-  )
-}
-
-function DiagRow({
-  label,
-  value,
-  warn = false,
-}: {
-  label: string
-  value: string
-  warn?: boolean
-}) {
-  return (
-    <div className="diag-row">
-      <span className="diag-label">{label}</span>
-      <span className={`diag-value ${warn ? 'diag-value--warn' : ''}`}>{value}</span>
     </div>
   )
 }

@@ -68,9 +68,9 @@ npm run dev          # http://localhost:5173
 npm run build        # production bundle in dist/
 ```
 
-The sensor starts by itself after onboarding — there is nothing to switch on. On a desktop browser
-there is no accelerometer, so use **Demo walk** in **Tune** to watch the dial and stats move. Step
-detection strictness (1–5) and stride length live in Tune too.
+Counting uses the phone's own step counter and starts by itself — there is nothing to switch on.
+**Sync** on the Today screen (or in Tune) re-reads it on demand. Step-detection strictness and
+stride length live in Tune; the motion fallback stays off unless you turn it on.
 
 ## Get the APK
 

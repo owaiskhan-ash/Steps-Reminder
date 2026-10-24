@@ -15,7 +15,7 @@ import {
   todayKey,
   type AppState,
 } from './lib/storage'
-import { useSimulator, useStepTracker } from './lib/useStepTracker'
+import { useStepTracker } from './lib/useStepTracker'
 import { useStepSync } from './lib/useStepSync'
 import {
   buzz,
@@ -31,7 +31,6 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('today')
   // The sensor starts itself — there is no longer a widget on the home screen.
   const [sensorOn, setSensorOn] = useState<boolean>(() => loadState().onboarded)
-  const [simulating, setSimulating] = useState(false)
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [dayKey, setDayKey] = useState(todayKey())
   const goalCelebrated = useRef(false)
@@ -112,8 +111,6 @@ export default function App() {
     experimentalMotion: state.experimentalMotion,
     onStep: () => addSteps(1),
   })
-
-  useSimulator(simulating, addSteps)
 
   /* ---------------------------------------------------------- goal cheer -- */
   useEffect(() => {
@@ -207,7 +204,6 @@ export default function App() {
   const reset = () => {
     clearState()
     setSensorOn(false)
-    setSimulating(false)
     clearReminderCopy()
     setTab('today')
     goalCelebrated.current = false
@@ -257,27 +253,17 @@ export default function App() {
           <Settings
             state={state}
             steps={steps}
-            simulating={simulating}
-            trackerStatus={tracker.status}
-            trackerDetail={tracker.detail}
-            diagnostics={tracker.diagnostics}
             stepSource={sync.source === 'pedometer' ? 'pedometer' : tracker.source}
             sourceReason={sync.reason}
             syncLabel={sync.label}
-            syncLast={sync.lastSync}
-            syncCounter={sync.counter}
-            syncSince={sync.since}
-            syncRebooted={sync.rebooted}
             onSync={syncNow}
             onExperimental={(on) =>
               setState((prev) => ({ ...prev, experimentalMotion: on }))
             }
-            onLogSteps={(n) => addSteps(n)}
             onGoal={setGoal}
             onTime={setReminderTime}
             onSensitivity={(n) => setState((prev) => ({ ...prev, sensitivity: n }))}
             onStride={(n) => setState((prev) => ({ ...prev, strideMeters: n }))}
-            onToggleSim={() => setSimulating((v) => !v)}
             onReset={reset}
             onGoHome={() => setTab('today')}
             onToast={pushToast}
