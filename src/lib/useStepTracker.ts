@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { StepDetector } from './pedometer'
 import { isNative } from './notify'
+import { startNativeSteps } from './nativeSteps'
 
 export type TrackerStatus = 'idle' | 'requesting' | 'running' | 'denied' | 'unsupported'
 
@@ -82,8 +83,30 @@ export function useStepTracker({ enabled, sensitivity, onStep }: Options) {
       setStatus('requesting')
       setDetail('')
 
-      // Native path — Capacitor Motion wraps the WebView sensor APIs and
-      // handles the iOS permission prompt. A watchdog falls back to raw
+      // Best path first: the hardware pedometer. Android's own motion
+      // classifier ignores hand swinging and shaking, so this can't over-count.
+      if (isNative()) {
+        try {
+          const native = await startNativeSteps(() => onStepRef.current())
+          if (cancelled) {
+            await native?.stop()
+            return
+          }
+          if (native) {
+            setStatus('running')
+            setDetail(native.kind === 'detector' ? 'Hardware pedometer' : 'Hardware step counter')
+            stopRef.current = () => {
+              void native.stop()
+            }
+            return
+          }
+        } catch {
+          /* fall through to the accelerometer */
+        }
+      }
+
+      // Native/accelerometer path — Capacitor Motion wraps the WebView sensor APIs
+      // and handles the iOS permission prompt. A watchdog falls back to raw
       // `devicemotion` if the plugin never delivers samples.
       if (isNative()) {
         try {

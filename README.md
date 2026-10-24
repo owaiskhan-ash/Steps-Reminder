@@ -14,10 +14,16 @@ slipping away short of your mark, it says so in plain words:
 
 - **First run asks two things** — your daily step target (2,000–20,000, with presets) and your
   reminder time. Nothing else.
-- **Counts real steps** from the accelerometer — and only real ones. Gravity is tracked per axis,
+- **Hardware pedometer first.** On Android the app reads `TYPE_STEP_DETECTOR` /
+  `TYPE_STEP_COUNTER` through a small native plugin (`StepCounterPlugin`), so counting is done by
+  the platform's motion classifier with the `ACTIVITY_RECOGNITION` permission — hand swinging and
+  shaking simply do not register, and battery use is far lower than sampling motion.
+- **Accelerometer fallback** for devices (or browsers) without a step sensor — and only real ones. Gravity is tracked per axis,
   the signed vertical bounce is smoothed and detected with hysteresis, and a footfall is credited
   only once the **rhythm** holds: peaks must fall inside a human cadence window (0.3–1.5 s apart)
-  with low variance. Picking the phone up, waving it or a bumpy bus ride never commits steps.
+  with low variance, **and the waveform looks like an impact** (positive skew, high crest factor)
+  rather than a smooth wave. Picking the phone up, swinging it, waving or a bumpy bus ride never
+  commits steps; walking tracks the real cadence within a step or two.
 - **Reminds you once a day** at your chosen hour, with live copy that reflects exactly how many
   steps are still missing. Native Android builds use a repeating local notification; the web build
   fires a browser notification while the app is open and always shows an in-app nudge.

@@ -147,8 +147,9 @@ export function Settings({
           aria-label="Step detection sensitivity"
         />
         <p className="hint" style={{ color: 'rgba(20,11,7,.62)' }}>
-          Steps only count when the rhythm of your walking is steady — picking up or shaking the
-          phone adds nothing. Go stricter if it still over-counts.
+          On Android the hardware pedometer does the counting and ignores hand movement
+          entirely. Without it, steps only count when both the rhythm and the impact shape of
+          your walking hold — swinging or shaking the phone adds nothing.
         </p>
 
         <div style={{ height: 1, background: 'rgba(74,45,22,.18)', margin: '16px 0 4px' }} />
@@ -213,7 +214,7 @@ export function Settings({
           <div>
             <div className="settings-row-title">SC · Step Reminder</div>
             <div className="settings-row-sub">
-              Version 1.1.1 · leather, felt and suede · made quietly
+              Version 1.1.2 · leather, felt and suede · made quietly
             </div>
           </div>
         </div>
