@@ -16,6 +16,7 @@ import {
   type AppState,
 } from './lib/storage'
 import { useSimulator, useStepTracker } from './lib/useStepTracker'
+import { useStepSync } from './lib/useStepSync'
 import {
   buzz,
   fireInAppReminder,
@@ -51,6 +52,36 @@ export default function App() {
     setToasts((prev) => prev.filter((t) => t.id !== id))
   }, [])
 
+  /** Authoritative total from the phone: never lowers what is already stored. */
+  const adoptTodaySteps = useCallback((n: number) => {
+    if (!Number.isFinite(n) || n <= 0) return
+    setState((prev) => {
+      const key = todayKey()
+      const current = prev.days[key]?.steps ?? 0
+      if (n <= current) return prev
+      return {
+        ...prev,
+        days: { ...prev.days, [key]: { steps: Math.round(n), goal: prev.goal } },
+      }
+    })
+  }, [])
+
+  /** Days banked at midnight while the app was closed. */
+  const mergeHistory = useCallback((days: Record<string, number>) => {
+    setState((prev) => {
+      let changed = false
+      const next = { ...prev.days }
+      for (const [date, steps] of Object.entries(days)) {
+        const existing = next[date]?.steps ?? 0
+        if (steps > existing) {
+          next[date] = { steps, goal: prev.goal }
+          changed = true
+        }
+      }
+      return changed ? { ...prev, days: next } : prev
+    })
+  }, [])
+
   const addSteps = useCallback((n: number) => {
     if (n <= 0) return
     setState((prev) => {
@@ -66,8 +97,14 @@ export default function App() {
     })
   }, [])
 
+  const sync = useStepSync({
+    enabled: state.onboarded,
+    onTodaySteps: adoptTodaySteps,
+    onHistory: mergeHistory,
+  })
+
   const tracker = useStepTracker({
-    enabled: sensorOn,
+    enabled: sensorOn && state.experimentalMotion && sync.source !== 'pedometer',
     sensitivity: state.sensitivity,
     experimentalMotion: state.experimentalMotion,
     onStep: () => addSteps(1),
@@ -193,8 +230,9 @@ export default function App() {
             state={state}
             steps={steps}
             trackerStatus={tracker.status}
-            stepSource={tracker.source}
-            sourceReason={tracker.reason}
+            stepSource={sync.source === 'pedometer' ? 'pedometer' : tracker.source}
+            sourceReason={sync.source === 'pedometer' ? '' : sync.reason || tracker.reason}
+            countedSince={sync.since}
             onOpenSettings={() => setTab('settings')}
           />
         )}
@@ -207,8 +245,14 @@ export default function App() {
             trackerStatus={tracker.status}
             trackerDetail={tracker.detail}
             diagnostics={tracker.diagnostics}
-            stepSource={tracker.source}
-            sourceReason={tracker.reason}
+            stepSource={sync.source === 'pedometer' ? 'pedometer' : tracker.source}
+            sourceReason={sync.reason}
+            syncLabel={sync.label}
+            syncLast={sync.lastSync}
+            syncCounter={sync.counter}
+            syncSince={sync.since}
+            syncRebooted={sync.rebooted}
+            onSync={() => void sync.sync()}
             onExperimental={(on) =>
               setState((prev) => ({ ...prev, experimentalMotion: on }))
             }

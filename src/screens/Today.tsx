@@ -23,6 +23,8 @@ type Props = {
   trackerStatus: TrackerStatus
   stepSource: StepSource
   sourceReason: string
+  /** Set when today's count began mid-day (e.g. app first opened at 14:03). */
+  countedSince: string | null
   onOpenSettings: () => void
 }
 
@@ -32,6 +34,7 @@ export function Today({
   trackerStatus,
   stepSource,
   sourceReason,
+  countedSince,
   onOpenSettings,
 }: Props) {
   const goal = state.goal
@@ -43,7 +46,7 @@ export function Today({
   const days = lastSevenDays(state)
 
   const statusLabel =
-    stepSource === 'hardware'
+    stepSource === 'pedometer'
       ? 'Pedometer'
       : stepSource === 'motion'
         ? 'Experimental'
@@ -142,7 +145,11 @@ export function Today({
           <div className="dial-reminder">
             <Bell size={11} />
             <span>
-              Reminder {prettyTime(state.reminderTime)} · in {humanGap(mins)}
+              {stepSource === 'pedometer'
+                ? countedSince
+                  ? `Counting since ${countedSince} · reminder ${prettyTime(state.reminderTime)}`
+                  : `From the phone’s step counter · reminder ${prettyTime(state.reminderTime)}`
+                : `Reminder ${prettyTime(state.reminderTime)} · in ${humanGap(mins)}`}
             </span>
           </div>
         )}

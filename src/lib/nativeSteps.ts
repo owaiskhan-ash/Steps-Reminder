@@ -3,18 +3,27 @@ import { Capacitor, registerPlugin, type PluginListenerHandle } from '@capacitor
 export type StepSensorKind = 'detector' | 'counter' | 'none'
 
 /** Where a step count came from. Surfaced in the UI so nothing is silent. */
-export type StepSource = 'hardware' | 'motion' | 'none'
+export type StepSource = 'pedometer' | 'motion' | 'manual' | 'none'
 
-export type NativeStepStatus =
-  | { ok: true; kind: StepSensorKind }
-  | { ok: false; reason: string }
+export type PedometerReading = {
+  steps: number
+  counter: number
+  available: boolean
+  rebooted: boolean
+  baselineStartedNow: boolean
+  since?: string
+  /** Daily totals banked by the midnight alarm: { "2026-10-23": 8342 } */
+  history?: Record<string, number>
+  permission?: 'granted' | 'denied' | 'prompt'
+}
 
 type StepCounterPlugin = {
   isAvailable(): Promise<{ available: boolean; kind: StepSensorKind }>
+  getTodaySteps(): Promise<PedometerReading>
+  getRawCounter(): Promise<{ counter: number }>
+  bankToday(): Promise<{ ok: boolean; history: string }>
   start(): Promise<void>
   stop(): Promise<void>
-  checkPermissions(): Promise<{ activity: 'granted' | 'denied' | 'prompt' }>
-  requestPermissions(): Promise<{ activity: 'granted' | 'denied' | 'prompt' }>
   addListener(event: 'step', listener: () => void): Promise<PluginListenerHandle>
 }
 
@@ -24,79 +33,56 @@ export function nativeStepsSupported(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === 'android'
 }
 
-/** True when running in a browser, where there is no step sensor at all. */
 export function isWebBuild(): boolean {
   return !Capacitor.isNativePlatform()
 }
 
-/**
- * Probes the hardware pedometer without starting it, so the UI can explain why
- * hardware counting is or isn't in use instead of silently degrading.
- */
-export async function probeNativeSteps(): Promise<NativeStepStatus> {
+/** Reads today's total from the phone's counter, with an explicit reason on failure. */
+export async function readPedometer(): Promise<
+  { ok: true; reading: PedometerReading } | { ok: false; reason: string }
+> {
   if (!nativeStepsSupported()) {
-    return { ok: false, reason: 'Web build — no step sensor on this platform.' }
+    return { ok: false, reason: 'Web build — the phone step counter is only on Android.' }
   }
   try {
     const availability = await StepCounter.isAvailable()
-    if (!availability.available) {
-      return { ok: false, reason: 'This device reports no step sensor.' }
+    if (!availability.available || availability.kind === 'none') {
+      return { ok: false, reason: 'This phone reports no step counter.' }
     }
-    const permission = await StepCounter.checkPermissions()
-    if (permission.activity === 'denied') {
+    const reading = await StepCounter.getTodaySteps()
+    if (reading.permission === 'denied') {
       return {
         ok: false,
-        reason: 'Activity permission was blocked — allow it in system settings.',
+        reason: 'Activity permission was refused — allow it in system settings.',
       }
     }
-    return { ok: true, kind: availability.kind }
-  } catch {
-    return { ok: false, reason: 'The step counter plugin did not respond.' }
+    if (!reading.available) {
+      return { ok: false, reason: 'The step counter returned no reading.' }
+    }
+    return { ok: true, reading }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    return { ok: false, reason: `Step counter unavailable: ${message}` }
   }
 }
 
-/**
- * Starts the hardware pedometer. Returns an explicit reason on failure rather
- * than null, because a silent failure is what let gestures masquerade as steps.
- */
-export async function startNativeSteps(
-  onStep: () => void,
-): Promise<
-  | { ok: true; kind: StepSensorKind; stop: () => Promise<void> }
-  | { ok: false; reason: string }
-> {
-  if (!nativeStepsSupported()) {
-    return { ok: false, reason: 'Web build — hardware counting unavailable.' }
-  }
-
+export async function readRawCounter(): Promise<number | null> {
+  if (!nativeStepsSupported()) return null
   try {
-    const availability = await StepCounter.isAvailable()
-    if (!availability.available) {
-      return { ok: false, reason: 'This device reports no step sensor.' }
-    }
+    const { counter } = await StepCounter.getRawCounter()
+    return counter >= 0 ? counter : null
+  } catch {
+    return null
+  }
+}
 
-    const permission = await StepCounter.requestPermissions()
-    if (permission.activity === 'denied') {
-      return { ok: false, reason: 'Activity permission was denied.' }
-    }
-
-    const handle = await StepCounter.addListener('step', onStep)
-    await StepCounter.start()
-
-    return {
-      ok: true,
-      kind: availability.kind,
-      stop: async () => {
-        try {
-          await StepCounter.stop()
-        } catch {
-          /* ignore */
-        }
-        await handle.remove()
-      },
-    }
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error)
-    return { ok: false, reason: `Step counter failed: ${message}` }
+/** Forces the midnight banking now (used by the diagnostics panel). */
+export async function bankToday(): Promise<Record<string, number> | null> {
+  if (!nativeStepsSupported()) return null
+  try {
+    const { history } = await StepCounter.bankToday()
+    return JSON.parse(history) as Record<string, number>
+  } catch {
+    return null
   }
 }

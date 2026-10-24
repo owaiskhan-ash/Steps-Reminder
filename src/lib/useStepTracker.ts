@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { StepDetector, type DetectorDiagnostics } from './pedometer'
 import { isNative } from './notify'
-import { probeNativeSteps, startNativeSteps, type StepSource } from './nativeSteps'
+import { type StepSource } from './nativeSteps'
 
 export type TrackerStatus = 'idle' | 'requesting' | 'running' | 'denied' | 'unsupported'
 
@@ -97,39 +97,12 @@ export function useStepTracker({
       setStatus('requesting')
       setDetail('')
 
-      // The hardware pedometer is the ONLY default source: Android's own motion
-      // classifier ignores hand swinging, shaking and rotating, so gestures
-      // cannot create steps. If it is unavailable we say so and count nothing
-      // rather than quietly switching to the gesture-prone detector.
-      if (isNative()) {
-        const native = await startNativeSteps(() => onStepRef.current())
-        if (cancelled) {
-          if (native.ok) await native.stop()
-          return
-        }
-        if (native.ok) {
-          setSource('hardware')
-          setReason('')
-          setStatus('running')
-          setDetail(native.kind === 'detector' ? 'Hardware pedometer' : 'Hardware step counter')
-          stopRef.current = () => {
-            void native.stop()
-          }
-          return
-        }
-        setReason(native.reason)
-        setSource('none')
+      // Motion counting is the explicit fallback for phones without a step
+      // counter. The phone's own counter (useStepSync) takes precedence.
+      if (!isNative() && typeof window === 'undefined') {
         setStatus('unsupported')
-        setDetail(native.reason)
-        if (!experimentalMotion) return
-      } else if (!experimentalMotion) {
-        // Browser: nothing to count with unless motion counting is enabled.
-        const probe = await probeNativeSteps()
-        const why = probe.ok ? 'Web build — no step sensor.' : probe.reason
-        setReason(why)
         setSource('none')
-        setStatus('unsupported')
-        setDetail(why)
+        setReason('No motion sensor on this platform.')
         return
       }
 

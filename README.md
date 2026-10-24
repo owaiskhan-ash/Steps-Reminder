@@ -14,15 +14,17 @@ slipping away short of your mark, it says so in plain words:
 
 - **First run asks two things** — your daily step target (2,000–20,000, with presets) and your
   reminder time. Nothing else.
-- **Hardware pedometer only, by default.** On Android the app reads `TYPE_STEP_DETECTOR` /
-  `TYPE_STEP_COUNTER` through a small native plugin (`StepCounterPlugin`), so counting is done by
-  the platform's motion classifier with the `ACTIVITY_RECOGNITION` permission — hand swinging and
-  shaking simply do not register, and battery use is far lower than sampling motion.
-- **No silent fallback.** If the hardware pedometer is unavailable (no sensor, permission blocked,
-  plugin error) the app says so on the Today screen and counts **nothing**, rather than quietly
-  switching to the gesture-prone detector.
-- **Motion counting is opt-in.** *Tune → Count steps with motion sensor* enables the accelerometer
-  path for devices without a step sensor, with five gates: world-frame
+- **Your phone's own step counter.** Steps come from Android's `TYPE_STEP_COUNTER` — a cumulative
+  total the OS keeps while the app is closed — resolved against a persisted midnight baseline. Open
+  the app at any hour and you see the day's real total, including steps taken when it wasn't running.
+  No login, no Google Fit, no Health Connect, no cloud.
+- **History builds itself.** A midnight alarm banks the finished day's total, so a week of data
+  appears even if you never open the app. A boot receiver re-arms it after a restart, and counter
+  resets are detected rather than producing nonsense.
+- **No silent fallback.** If the counter is unavailable (no sensor, `ACTIVITY_RECOGNITION` refused)
+  the Today screen names the reason and counts **nothing** rather than guessing from motion.
+- **Motion counting is a last resort.** *Tune → Fallback: motion sensor* enables the accelerometer
+  path for phones with no step counter, with five gates: world-frame
   gravity projection, a **gyroscope gate** (walking rocks the phone gently; arm swinging, figure-8s and
   revolutions exceed the angular limit and are discarded), cadence, impact-shaped waveform, and a
   **sustained-walk requirement** (nothing is credited until 8 consecutive valid footfalls confirm you are

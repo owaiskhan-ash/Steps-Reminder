@@ -1,0 +1,212 @@
+package com.sc.stepreminder;
+
+import android.app.AlarmManager;
+import android.app.PendingIntent;
+import android.content.Context;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
+import android.os.Build;
+
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Locale;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+
+/**
+ * Reads the phone's own step counter (TYPE_STEP_COUNTER) and keeps a persisted
+ * daily baseline so today's total is known even for hours when the app was not
+ * open. The counter itself is maintained by the OS/hardware and survives the app
+ * being killed; it resets only on reboot, which is detected here.
+ *
+ * A midnight alarm records yesterday's total and starts a fresh baseline, so a
+ * week of history builds up without the app ever being launched.
+ */
+final class StepStore {
+
+    private static final String PREFS = "sc_step_store";
+    private static final String KEY_BASELINE_DATE = "baseline_date";
+    private static final String KEY_BASELINE_VALUE = "baseline_value";
+    private static final String KEY_LAST_VALUE = "last_value";
+    private static final String DAY_PREFIX = "day_";
+
+    private StepStore() {}
+
+    static SharedPreferences prefs(Context context) {
+        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+    }
+
+    static String today() {
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(new Date());
+    }
+
+    /** Reads the cumulative counter once, blocking briefly. -1 when unavailable. */
+    static float readCounter(Context context, long timeoutMs) {
+        SensorManager manager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
+        if (manager == null) return -1f;
+        Sensor sensor = manager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER);
+        if (sensor == null) return -1f;
+
+        final float[] value = { -1f };
+        final CountDownLatch latch = new CountDownLatch(1);
+        SensorEventListener listener = new SensorEventListener() {
+            @Override
+            public void onSensorChanged(SensorEvent event) {
+                value[0] = event.values[0];
+                latch.countDown();
+            }
+
+            @Override
+            public void onAccuracyChanged(Sensor sensor, int accuracy) {}
+        };
+
+        manager.registerListener(listener, sensor, SensorManager.SENSOR_DELAY_FASTEST);
+        try {
+            latch.await(timeoutMs, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        } finally {
+            manager.unregisterListener(listener);
+        }
+        return value[0];
+    }
+
+    /** Result of resolving the counter against the stored baseline. */
+    static final class Today {
+        final int steps;
+        final float counter;
+        final boolean rebooted;
+        final boolean baselineStartedNow;
+        final String since;
+
+        Today(int steps, float counter, boolean rebooted, boolean baselineStartedNow, String since) {
+            this.steps = steps;
+            this.counter = counter;
+            this.rebooted = rebooted;
+            this.baselineStartedNow = baselineStartedNow;
+            this.since = since;
+        }
+    }
+
+    /**
+     * Today's steps from the counter. Establishes a baseline the first time it is
+     * called on a given day; if the app was closed across midnight the baseline
+     * restarts at "now" and {@code baselineStartedNow} is true so the UI can say
+     * "counting since 09:14" instead of inventing a number.
+     */
+    static Today resolveToday(Context context, float counter) {
+        SharedPreferences p = prefs(context);
+        String date = today();
+        String baselineDate = p.getString(KEY_BASELINE_DATE, null);
+        float baseline = p.getFloat(KEY_BASELINE_VALUE, -1f);
+        float lastValue = p.getFloat(KEY_LAST_VALUE, -1f);
+
+        if (counter < 0) {
+            return new Today(0, counter, false, false, null);
+        }
+
+        // Counter went backwards → the phone rebooted since the baseline.
+        boolean rebooted = lastValue >= 0 && counter < lastValue;
+        p.edit().putFloat(KEY_LAST_VALUE, counter).apply();
+
+        if (date.equals(baselineDate) && baseline >= 0 && !rebooted) {
+            int steps = Math.max(0, Math.round(counter - baseline));
+            return new Today(steps, counter, false, false, null);
+        }
+
+        // New day (or reboot): start from here.
+        String now = new SimpleDateFormat("HH:mm", Locale.US).format(new Date());
+        p.edit()
+            .putString(KEY_BASELINE_DATE, date)
+            .putFloat(KEY_BASELINE_VALUE, counter)
+            .apply();
+        int carried = rebooted ? Math.round(Math.max(0, counter)) : 0;
+        return new Today(carried, counter, rebooted, true, now);
+    }
+
+    /**
+     * Rolls the baseline at midnight: records the finished day's total and starts
+     * a new baseline from the current counter.
+     */
+    static void rollover(Context context) {
+        float counter = readCounter(context, 8000);
+        if (counter < 0) return;
+        SharedPreferences p = prefs(context);
+        String baselineDate = p.getString(KEY_BASELINE_DATE, null);
+        float baseline = p.getFloat(KEY_BASELINE_VALUE, -1f);
+
+        if (baselineDate != null && baseline >= 0 && counter >= baseline) {
+            int steps = Math.round(counter - baseline);
+            p.edit().putInt(DAY_PREFIX + baselineDate, steps).apply();
+        }
+
+        p.edit()
+            .putString(KEY_BASELINE_DATE, today())
+            .putFloat(KEY_BASELINE_VALUE, counter)
+            .putFloat(KEY_LAST_VALUE, counter)
+            .apply();
+    }
+
+    /** Stored daily totals (date → steps), for filling in history on open. */
+    static String historyJson(Context context) {
+        SharedPreferences p = prefs(context);
+        StringBuilder sb = new StringBuilder("{");
+        boolean first = true;
+        for (java.util.Map.Entry<String, ?> entry : p.getAll().entrySet()) {
+            if (!entry.getKey().startsWith(DAY_PREFIX)) continue;
+            Object value = entry.getValue();
+            if (!(value instanceof Integer)) continue;
+            if (!first) sb.append(',');
+            first = false;
+            sb.append('"').append(entry.getKey().substring(DAY_PREFIX.length())).append("\":")
+              .append(value);
+        }
+        return sb.append('}').toString();
+    }
+
+    /** Writes a day total (used when the plugin adopts an authoritative value). */
+    static void putDay(Context context, String date, int steps) {
+        prefs(context).edit().putInt(DAY_PREFIX + date, steps).apply();
+    }
+
+    /** Schedules the next midnight rollover. Safe to call often. */
+    static void scheduleMidnight(Context context) {
+        AlarmManager alarms = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+        if (alarms == null) return;
+
+        Intent intent = new Intent(context, MidnightReceiver.class);
+        PendingIntent pending = PendingIntent.getBroadcast(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        Calendar next = Calendar.getInstance();
+        next.add(Calendar.DAY_OF_YEAR, 1);
+        next.set(Calendar.HOUR_OF_DAY, 0);
+        next.set(Calendar.MINUTE, 5);
+        next.set(Calendar.SECOND, 0);
+        next.set(Calendar.MILLISECOND, 0);
+
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarms.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    next.getTimeInMillis(),
+                    pending
+                );
+            } else {
+                alarms.set(AlarmManager.RTC_WAKEUP, next.getTimeInMillis(), pending);
+            }
+        } catch (SecurityException e) {
+            // Exact alarms refused (user restricted them) — fall back to inexact.
+            alarms.set(AlarmManager.RTC_WAKEUP, next.getTimeInMillis(), pending);
+        }
+    }
+}

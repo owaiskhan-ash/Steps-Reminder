@@ -17,6 +17,12 @@ type Props = {
   diagnostics: DetectorDiagnostics | null
   stepSource: StepSource
   sourceReason: string
+  syncLabel: string
+  syncLast: number | null
+  syncCounter: number | null
+  syncSince: string | null
+  syncRebooted: boolean
+  onSync: () => void
   onExperimental: (on: boolean) => void
   onLogSteps: (n: number) => void
   onGoal: (goal: number) => void
@@ -40,6 +46,12 @@ export function Settings({
   diagnostics,
   stepSource,
   sourceReason,
+  syncLabel,
+  syncLast,
+  syncCounter,
+  syncSince,
+  syncRebooted,
+  onSync,
   onExperimental,
   onLogSteps,
   onGoal,
@@ -146,20 +158,35 @@ export function Settings({
         <Stitch inset={6} radius={16} color="rgba(74,45,22,.7)" opacity={0.6} />
         <div className="settings-row" style={{ paddingTop: 0, borderColor: 'rgba(74,45,22,.18)' }}>
           <div>
-            <div className="settings-row-title">Count steps with motion sensor</div>
+            <div className="settings-row-title">{syncLabel}</div>
             <div className="settings-row-sub">
-              {stepSource === 'hardware'
-                ? 'Not needed — the hardware pedometer is counting and cannot be fooled by gestures.'
-                : 'Uses the accelerometer and gyroscope. Rotating or swinging the phone can still add steps.'}
+              {stepSource === 'pedometer'
+                ? 'Read from the phone’s own step counter — it keeps counting while the app is closed, and gestures cannot add steps.'
+                : sourceReason || 'No phone step counter available.'}
+            </div>
+          </div>
+          <button
+            className="btn btn--ghost"
+            onClick={onSync}
+            style={{ padding: '10px 12px', flex: 'none' }}
+          >
+            Sync
+          </button>
+        </div>
+        <div className="settings-row" style={{ borderColor: 'rgba(74,45,22,.18)' }}>
+          <div>
+            <div className="settings-row-title">Fallback: motion sensor</div>
+            <div className="settings-row-sub">
+              Only for phones without a step counter. Uses the accelerometer and gyroscope; gestures
+              can still add steps.
             </div>
           </div>
           <button
             className={`switch ${state.experimentalMotion ? 'switch--on' : ''}`}
             onClick={() => onExperimental(!state.experimentalMotion)}
             aria-pressed={state.experimentalMotion}
-            aria-label="Count steps with motion sensor"
-            disabled={stepSource === 'hardware'}
-            style={stepSource === 'hardware' ? { opacity: 0.45 } : undefined}
+            aria-label="Fallback motion counting"
+            style={stepSource === 'pedometer' ? { opacity: 0.45 } : undefined}
           />
         </div>
         <div className="field-label" style={{ marginTop: 14 }}>
@@ -218,14 +245,24 @@ export function Settings({
           <DiagRow
             label="Source"
             value={
-              stepSource === 'hardware'
-                ? 'Hardware pedometer'
+              stepSource === 'pedometer'
+                ? 'Phone step counter'
                 : stepSource === 'motion'
                   ? 'Motion sensor (experimental)'
                   : 'None'
             }
             warn={stepSource === 'motion'}
           />
+          <DiagRow
+            label="Counter"
+            value={syncCounter != null ? `${Math.round(syncCounter).toLocaleString()} since boot` : '—'}
+          />
+          <DiagRow
+            label="Last sync"
+            value={syncLast ? new Date(syncLast).toLocaleTimeString() : '—'}
+          />
+          <DiagRow label="Day started" value={syncSince ? `${syncSince} (mid-day)` : 'Midnight'} />
+          {syncRebooted && <DiagRow label="Note" value="Phone rebooted — counter restarted" warn />}
           <DiagRow label="Sensor" value={trackerDetail || 'starting…'} />
           <DiagRow
             label="Status"
@@ -350,7 +387,7 @@ export function Settings({
           <div>
             <div className="settings-row-title">SC · Step Reminder</div>
             <div className="settings-row-sub">
-              Version 1.2.1 · leather, felt and suede · made quietly
+              Version 1.3.0 · leather, felt and suede · made quietly
             </div>
           </div>
         </div>

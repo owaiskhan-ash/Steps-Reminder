@@ -1,7 +1,6 @@
 package com.sc.stepreminder;
 
 import android.Manifest;
-import android.content.Context;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -18,15 +17,16 @@ import com.getcapacitor.annotation.Permission;
 import com.getcapacitor.annotation.PermissionCallback;
 
 /**
- * Hardware step counting.
+ * The phone's own step counter.
  *
- * Android's TYPE_STEP_DETECTOR fires one event per detected footfall using the
- * platform's own motion classifier — it does not count hand swinging, shaking or
- * bumps, and it costs far less battery than sampling the accelerometer. Where
- * only TYPE_STEP_COUNTER exists (a cumulative counter since boot) we diff it.
+ * `TYPE_STEP_COUNTER` is a cumulative total maintained by the hardware/OS that
+ * keeps advancing even when this app is closed. We resolve it against a persisted
+ * midnight baseline, so opening the app at any hour shows today's real total —
+ * including steps taken while it wasn't running — with no login, no Health
+ * Connect and no cloud.
  *
- * The web layer prefers this plugin and falls back to its accelerometer detector
- * when no hardware step sensor is present.
+ * `TYPE_STEP_DETECTOR` (one event per footfall) is kept only for an optional live
+ * readout.
  */
 @CapacitorPlugin(
     name = "StepCounter",
@@ -37,64 +37,130 @@ import com.getcapacitor.annotation.PermissionCallback;
 public class StepCounterPlugin extends Plugin implements SensorEventListener {
 
     private SensorManager sensorManager;
-    private Sensor stepDetector;
     private Sensor stepCounter;
-    private float lastCounterValue = -1f;
-    private boolean listening = false;
+    private Sensor stepDetector;
+    private volatile float latestCounter = -1f;
+    private boolean listening;
 
     @Override
     public void load() {
-        Context context = getContext();
-        sensorManager = (SensorManager) context.getSystemService(Context.SENSOR_SERVICE);
+        sensorManager = (SensorManager) getContext().getSystemService(android.content.Context.SENSOR_SERVICE);
         if (sensorManager == null) return;
-        stepDetector = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR);
         stepCounter = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER);
+        stepDetector = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_DETECTOR);
+        // Keep the midnight rollover armed whenever the plugin loads.
+        StepStore.scheduleMidnight(getContext());
     }
 
+    @Override
+    public void onSensorChanged(SensorEvent event) {
+        if (event.sensor.getType() == Sensor.TYPE_STEP_COUNTER) {
+            latestCounter = event.values[0];
+        } else if (event.sensor.getType() == Sensor.TYPE_STEP_DETECTOR) {
+            notifyListeners("step", new JSObject());
+        }
+    }
+
+    @Override
+    public void onAccuracyChanged(Sensor sensor, int accuracy) {}
+
+    /** True when this device exposes a cumulative step counter. */
     @PluginMethod
     public void isAvailable(PluginCall call) {
+        boolean counter = stepCounter != null;
+        boolean detector = stepDetector != null;
         JSObject result = new JSObject();
-        boolean available = stepDetector != null || stepCounter != null;
-        String kind = stepDetector != null ? "detector" : (stepCounter != null ? "counter" : "none");
-        result.put("available", available);
-        result.put("kind", kind);
+        result.put("available", counter || detector);
+        result.put("kind", counter ? "counter" : (detector ? "detector" : "none"));
         call.resolve(result);
     }
 
+    /**
+     * Today's steps from the phone counter, resolved against the stored baseline.
+     * Resolves with { steps, counter, rebooted, baselineStartedNow, since, history }.
+     */
     @PluginMethod
-    public void start(PluginCall call) {
-        // ACTIVITY_RECOGNITION only exists from Android 10; older versions grant
-        // step sensors to any app.
+    public void getTodaySteps(PluginCall call) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
             && getPermissionState("activity") != PermissionState.GRANTED) {
             requestPermissionForAlias("activity", call, "onActivityPermission");
             return;
         }
-        startListening(call);
+        resolveToday(call);
     }
 
     @PermissionCallback
     private void onActivityPermission(PluginCall call) {
         if (getPermissionState("activity") == PermissionState.GRANTED) {
-            startListening(call);
+            resolveToday(call);
         } else {
-            call.reject("Activity recognition permission is needed for hardware step counting.");
+            JSObject result = new JSObject();
+            result.put("steps", 0);
+            result.put("permission", "denied");
+            call.resolve(result);
         }
     }
 
-    private void startListening(PluginCall call) {
-        if (listening) {
-            call.resolve();
+    private void resolveToday(PluginCall call) {
+        final android.content.Context context = getContext();
+        new Thread(() -> {
+            float counter = StepStore.readCounter(context, 2500);
+            JSObject result = new JSObject();
+            if (counter < 0) {
+                result.put("steps", 0);
+                result.put("available", false);
+                call.resolve(result);
+                return;
+            }
+            latestCounter = counter;
+            StepStore.Today today = StepStore.resolveToday(context, counter);
+            result.put("steps", today.steps);
+            result.put("counter", today.counter);
+            result.put("rebooted", today.rebooted);
+            result.put("baselineStartedNow", today.baselineStartedNow);
+            if (today.since != null) result.put("since", today.since);
+            result.put("available", true);
+            result.put("history", StepStore.historyJson(context));
+            call.resolve(result);
+        }).start();
+    }
+
+    /** Debug/verification helper: the raw cumulative counter value. */
+    @PluginMethod
+    public void getRawCounter(PluginCall call) {
+        final android.content.Context context = getContext();
+        new Thread(() -> {
+            float counter = StepStore.readCounter(context, 2500);
+            JSObject result = new JSObject();
+            result.put("counter", counter);
+            call.resolve(result);
+        }).start();
+    }
+
+    /** Manual trigger for the midnight banking, exposed for testing. */
+    @PluginMethod
+    public void bankToday(PluginCall call) {
+        final android.content.Context context = getContext();
+        new Thread(() -> {
+            StepStore.rollover(context);
+            JSObject result = new JSObject();
+            result.put("ok", true);
+            result.put("history", StepStore.historyJson(context));
+            call.resolve(result);
+        }).start();
+    }
+
+    /** Optional live footfall events (TYPE_STEP_DETECTOR). */
+    @PluginMethod
+    public void start(PluginCall call) {
+        if (stepDetector == null || sensorManager == null) {
+            call.reject("This device has no step detector.");
             return;
         }
-        Sensor sensor = stepDetector != null ? stepDetector : stepCounter;
-        if (sensor == null || sensorManager == null) {
-            call.reject("This device has no step sensor.");
-            return;
+        if (!listening) {
+            sensorManager.registerListener(this, stepDetector, SensorManager.SENSOR_DELAY_UI);
+            listening = true;
         }
-        sensorManager.registerListener(this, sensor, SensorManager.SENSOR_DELAY_UI);
-        listening = true;
-        lastCounterValue = -1f;
         call.resolve();
     }
 
@@ -103,39 +169,5 @@ public class StepCounterPlugin extends Plugin implements SensorEventListener {
         if (sensorManager != null) sensorManager.unregisterListener(this);
         listening = false;
         call.resolve();
-    }
-
-    @Override
-    public void onSensorChanged(SensorEvent event) {
-        int type = event.sensor.getType();
-        if (type == Sensor.TYPE_STEP_DETECTOR) {
-            emitStep();
-        } else if (type == Sensor.TYPE_STEP_COUNTER) {
-            float total = event.values[0];
-            if (lastCounterValue >= 0f && total > lastCounterValue) {
-                int delta = Math.round(total - lastCounterValue);
-                // Ignore absurd jumps (e.g. sensor reset after reboot).
-                if (delta > 0 && delta < 500) {
-                    for (int i = 0; i < delta; i++) emitStep();
-                }
-            }
-            lastCounterValue = total;
-        }
-    }
-
-    private void emitStep() {
-        notifyListeners("step", new JSObject());
-    }
-
-    @Override
-    public void onAccuracyChanged(Sensor sensor, int accuracy) {
-        // nothing to do
-    }
-
-    @Override
-    protected void handleOnPause() {
-        // Keep listening: the WebView layer decides when counting should stop, and
-        // the hardware sensor is cheap.
-        super.handleOnPause();
     }
 }
