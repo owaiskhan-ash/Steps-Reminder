@@ -24,17 +24,17 @@ export function Dial({ steps, goal, remaining, goalReached }: Props) {
       <svg viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label={`${fmt(steps)} of ${fmt(goal)} steps`}>
         <defs>
           <radialGradient id="face" cx="38%" cy="26%" r="80%">
-            <stop offset="0%" stopColor="#77512e" />
-            <stop offset="55%" stopColor="#674328" />
-            <stop offset="100%" stopColor="#5a3a20" />
+            <stop offset="0%" stopColor="#5f3c2e" />
+            <stop offset="55%" stopColor="#563528" />
+            <stop offset="100%" stopColor="#4c2e22" />
           </radialGradient>
           <radialGradient id="recess" cx="46%" cy="30%" r="78%">
-            <stop offset="0%" stopColor="#261a0e" />
-            <stop offset="100%" stopColor="#201509" />
+            <stop offset="0%" stopColor="#1c1410" />
+            <stop offset="100%" stopColor="#171110" />
           </radialGradient>
           <linearGradient id="threadArc" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#eadcbe" />
-            <stop offset="100%" stopColor="#d3b183" />
+            <stop offset="0%" stopColor="#e6d3ae" />
+            <stop offset="100%" stopColor="#cbab84" />
           </linearGradient>
           <linearGradient id="threadArcDone" x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#cfdcb6" />

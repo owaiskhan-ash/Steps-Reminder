@@ -13,7 +13,7 @@ import sharp from 'sharp'
 const ROOT = new URL('..', import.meta.url).pathname
 const SRC = join(ROOT, 'assets/icon.png')
 const PUBLIC_ICONS = join(ROOT, 'public/icons')
-const BG = { r: 42, g: 26, b: 14, alpha: 1 }
+const BG = { r: 26, g: 18, b: 14, alpha: 1 }
 
 const exists = async (p) => {
   try {
@@ -71,8 +71,8 @@ await writeFile(
       start_url: '/',
       display: 'standalone',
       orientation: 'portrait',
-      background_color: '#150f0a',
-      theme_color: '#241a13',
+      background_color: '#120e0b',
+      theme_color: '#1a1210',
       icons: [
         { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
         { src: '/icons/icon-320.png', sizes: '320x320', type: 'image/png' },
@@ -114,6 +114,23 @@ if (hasAndroid) {
 
   // The adaptive background is a flat leather tone declared in
   // res/values/ic_launcher_background.xml (a PNG here would collide).
+
+  // Branded splash screens: leather ground with the mark centred.
+  const { readdir } = await import('node:fs/promises')
+  const resDirs = await readdir(androidRes)
+  for (const dir of resDirs.filter((d) => d.startsWith('drawable'))) {
+    const file = join(androidRes, dir, 'splash.png')
+    if (!(await exists(file))) continue
+    const meta = await sharp(file).metadata()
+    const w = meta.width ?? 480
+    const h = meta.height ?? 320
+    const side = Math.round(Math.min(w, h) * 0.34)
+    const art = await sharp(source).resize(side, side, { fit: 'cover' }).png().toBuffer()
+    await sharp({ create: { width: w, height: h, channels: 4, background: BG } })
+      .composite([{ input: art, top: Math.round((h - side) / 2), left: Math.round((w - side) / 2) }])
+      .png({ compressionLevel: 9 })
+      .toFile(file)
+  }
 
   // Status-bar icon must be a flat white silhouette on transparency.
   const statusDir = join(androidRes, 'drawable')

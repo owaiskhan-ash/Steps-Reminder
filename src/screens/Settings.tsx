@@ -120,10 +120,10 @@ export function Settings({
       <section className="card card--suede">
         <Stitch inset={6} radius={16} color="rgba(74,45,22,.7)" opacity={0.6} />
         <div className="field-label">
-          <span className="label" style={{ color: 'rgba(42,26,14,.6)' }}>
+          <span className="label" style={{ color: 'rgba(20,11,7,.68)' }}>
             Sensor sensitivity
           </span>
-          <span className="field-value" style={{ color: '#2c1b0e' }}>
+          <span className="field-value" style={{ color: '#140b07' }}>
             {['Light', 'Soft', 'Balanced', 'Firm', 'Heavy'][Math.min(4, Math.max(0, state.sensitivity - 1))]}
           </span>
         </div>
@@ -137,20 +137,20 @@ export function Settings({
           onChange={(e) => onSensitivity(Number(e.target.value))}
           aria-label="Step sensor sensitivity"
         />
-        <p className="hint" style={{ color: 'rgba(42,26,14,.55)' }}>
+        <p className="hint" style={{ color: 'rgba(20,11,7,.62)' }}>
           Turn it down for light footfalls, up if a bumpy commute adds phantom steps.
         </p>
 
         <div style={{ height: 1, background: 'rgba(74,45,22,.18)', margin: '16px 0 4px' }} />
 
         <div className="field-label" style={{ marginTop: 12 }}>
-          <span className="label" style={{ color: 'rgba(42,26,14,.6)' }}>
+          <span className="label" style={{ color: 'rgba(20,11,7,.68)' }}>
             <Ruler size={12} style={{ verticalAlign: '-2px', marginRight: 6 }} />
             Stride length
           </span>
-          <span className="field-value" style={{ color: '#2c1b0e', fontSize: 17 }}>
+          <span className="field-value" style={{ color: '#140b07', fontSize: 17 }}>
             {(state.strideMeters * 100).toFixed(0)}
-            <small style={{ color: 'rgba(42,26,14,.5)' }}>cm</small>
+            <small style={{ color: 'rgba(20,11,7,.56)' }}>cm</small>
           </span>
         </div>
         <input

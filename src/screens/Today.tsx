@@ -188,7 +188,7 @@ export function Today({
             {simulating ? 'Stop demo' : 'Demo walk'}
           </button>
         </div>
-        <div className="hint" style={{ color: 'rgba(42,26,14,.5)' }}>
+        <div className="hint" style={{ color: 'rgba(20,11,7,.6)' }}>
           Real counting uses the accelerometer. The demo walk adds steps at a walking pace so you can
           see the dial and reminders work.
         </div>

@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'SC Step Reminder',
   webDir: 'dist',
   android: {
-    backgroundColor: '#150f0a',
+    backgroundColor: '#120e0b',
   },
   plugins: {
     LocalNotifications: {
