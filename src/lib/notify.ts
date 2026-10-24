@@ -146,6 +146,15 @@ export function fireInAppReminder(remaining: number, goal: number) {
   return { title, body }
 }
 
+/** Drops the cached web reminder copy when everything is reset. */
+export function clearReminderCopy() {
+  try {
+    localStorage.removeItem('sc-reminder-copy')
+  } catch {
+    /* ignore */
+  }
+}
+
 export async function cancelDailyReminder() {
   if (!isNative()) return
   try {

@@ -23,11 +23,13 @@ import {
   scheduleDailyReminder,
 } from './lib/notify'
 import { fmt, prettyTime } from './lib/format'
+import { clearReminderCopy } from './lib/notify'
 
 export default function App() {
   const [state, setState] = useState<AppState>(() => seedHistory(loadState()))
   const [tab, setTab] = useState<Tab>('today')
-  const [sensorOn, setSensorOn] = useState(false)
+  // The sensor starts itself — there is no longer a widget on the home screen.
+  const [sensorOn, setSensorOn] = useState<boolean>(() => loadState().onboarded)
   const [simulating, setSimulating] = useState(false)
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [dayKey, setDayKey] = useState(todayKey())
@@ -153,6 +155,7 @@ export default function App() {
     clearState()
     setSensorOn(false)
     setSimulating(false)
+    clearReminderCopy()
     setTab('today')
     goalCelebrated.current = false
     setState({ ...DEFAULT_STATE })
@@ -162,8 +165,8 @@ export default function App() {
   const completeOnboarding = (goal: number, reminderTime: string) => {
     setState((prev) => ({ ...prev, onboarded: true, goal, reminderTime }))
     pushToast('Your mark is set', `${fmt(goal)} steps a day · reminder at ${prettyTime(reminderTime)}.`)
-    // Ask the sensor for permission straight after a user gesture.
-    if (isNative()) setSensorOn(true)
+    // Straight after a user gesture, so the motion prompt (iOS) is allowed.
+    setSensorOn(true)
   }
 
   if (!state.onboarded) {
@@ -189,20 +192,7 @@ export default function App() {
             state={state}
             steps={steps}
             trackerStatus={tracker.status}
-            trackerDetail={tracker.detail}
-            simulating={simulating}
-            sensorOn={sensorOn}
-            onToggleSim={() => setSimulating((v) => !v)}
-            onToggleSensor={() => {
-              if (!sensorOn) {
-                setSensorOn(true)
-                setSimulating(false)
-              } else {
-                setSensorOn(false)
-              }
-            }}
             onOpenSettings={() => setTab('settings')}
-            onToast={pushToast}
           />
         )}
         {tab === 'history' && <History state={state} />}
@@ -210,11 +200,14 @@ export default function App() {
           <Settings
             state={state}
             steps={steps}
+            simulating={simulating}
             onGoal={setGoal}
             onTime={setReminderTime}
             onSensitivity={(n) => setState((prev) => ({ ...prev, sensitivity: n }))}
             onStride={(n) => setState((prev) => ({ ...prev, strideMeters: n }))}
+            onToggleSim={() => setSimulating((v) => !v)}
             onReset={reset}
+            onGoHome={() => setTab('today')}
             onToast={pushToast}
           />
         )}

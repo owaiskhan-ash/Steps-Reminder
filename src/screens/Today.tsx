@@ -1,16 +1,17 @@
 import { Dial } from '../components/Dial'
 import { Stitch } from '../components/Stitch'
+import { Bell, Flame, Ruler, Spark } from '../components/Icons'
 import {
-  Bell,
-  Clock,
-  Flame,
-  Footsteps,
-  Pause,
-  Play,
-  Ruler,
-  Spark,
-} from '../components/Icons'
-import { fmt, humanGap, kcal, km, minutesUntil, prettyDate, prettyTime, pct, shortDay } from '../lib/format'
+  fmt,
+  humanGap,
+  kcal,
+  km,
+  minutesUntil,
+  prettyDate,
+  prettyTime,
+  pct,
+  shortDay,
+} from '../lib/format'
 import type { AppState } from '../lib/storage'
 import { todayKey } from '../lib/storage'
 import type { TrackerStatus } from '../lib/useStepTracker'
@@ -19,44 +20,26 @@ type Props = {
   state: AppState
   steps: number
   trackerStatus: TrackerStatus
-  trackerDetail: string
-  simulating: boolean
-  sensorOn: boolean
-  onToggleSim: () => void
-  onToggleSensor: () => void
   onOpenSettings: () => void
-  onToast: (title: string, body: string) => void
 }
 
-const STATUS_COPY: Record<TrackerStatus, string> = {
-  idle: 'Sensor resting. Start it when you begin moving.',
-  requesting: 'Waiting for permission to read the motion sensor…',
-  running: 'Counting footfalls from the motion sensor.',
-  denied: 'Motion access declined. Enable it in system settings.',
-  unsupported: 'No motion sensor here — use the demo walk to preview.',
-}
-
-export function Today({
-  state,
-  steps,
-  trackerStatus,
-  trackerDetail,
-  simulating,
-  sensorOn,
-  onToggleSim,
-  onToggleSensor,
-  onOpenSettings,
-  onToast,
-}: Props) {
+export function Today({ state, steps, trackerStatus, onOpenSettings }: Props) {
   const goal = state.goal
   const remaining = Math.max(0, goal - steps)
   const goalReached = steps >= goal
-  const progress = pct(steps, goal)
   const mins = minutesUntil(state.reminderTime)
   const streak = computeStreak(state)
   const live = trackerStatus === 'running'
-
   const days = lastSevenDays(state)
+
+  const statusLabel =
+    trackerStatus === 'running'
+      ? 'Recording'
+      : trackerStatus === 'requesting'
+        ? 'Starting'
+        : trackerStatus === 'denied'
+          ? 'Sensor off'
+          : 'Idle'
 
   return (
     <div className="screen">
@@ -82,9 +65,15 @@ export function Today({
         <Stitch inset={6} radius={16} double opacity={0.42} />
         <div className="dial-head">
           <span className="label">{prettyDate()}</span>
-          <span className={`chip ${live || simulating ? 'chip--live' : ''}`}>
-            <span className="dot" style={{ background: live || simulating ? 'var(--good)' : 'rgba(241,228,204,.3)', boxShadow: 'none' }} />
-            {simulating ? 'Demo walk' : live ? 'Recording' : 'Paused'}
+          <span className={`chip ${live ? 'chip--live' : ''}`}>
+            <span
+              className="dot"
+              style={{
+                background: live ? 'var(--good)' : 'rgba(241,228,204,.3)',
+                boxShadow: 'none',
+              }}
+            />
+            {statusLabel}
           </span>
         </div>
 
@@ -92,7 +81,9 @@ export function Today({
 
         <div className="dial-foot">
           {goalReached ? (
-            <>Every one of your <strong>{fmt(goal)}</strong> steps is in. Rest easy.</>
+            <>
+              Every one of your <strong>{fmt(goal)}</strong> steps is in. Rest easy.
+            </>
           ) : (
             <>
               <strong>{fmt(remaining)}</strong> steps left · about{' '}
@@ -124,73 +115,12 @@ export function Today({
             </div>
           </div>
         </div>
-      </section>
 
-      <section className="card card--felt">
-        <Stitch inset={6} radius={16} opacity={0.34} />
-        <div className="reminder">
-          <div className="reminder-icon">
-            <Bell size={19} />
-          </div>
-          <div className="reminder-text">
-            <div className="reminder-title emboss">
-              {remaining > 0 ? (
-                <>
-                  You’re missing out <strong>{fmt(remaining)} steps</strong> for the day.
-                </>
-              ) : (
-                <>Nothing missing. Today’s target is met.</>
-              )}
-            </div>
-            <div className="reminder-meta">
-              <Clock size={11} style={{ verticalAlign: '-1px', marginRight: 4 }} />
-              Reminder {prettyTime(state.reminderTime)} · in {humanGap(mins)}
-            </div>
-          </div>
-        </div>
-        <div className="tracker-actions">
-          <button
-            className="btn btn--felt"
-            style={{ flex: 1 }}
-            onClick={() => {
-              onToast(
-                'Reminder preview',
-                remaining > 0
-                  ? `You’re missing out ${fmt(remaining)} of ${fmt(goal)} steps for the day.`
-                  : `All ${fmt(goal)} steps are in the bag. Beautifully done.`,
-              )
-            }}
-          >
-            <Bell size={14} /> Preview nudge
-          </button>
-        </div>
-      </section>
-
-      <section className="card card--suede">
-        <Stitch inset={6} radius={16} color="rgba(74,45,22,.7)" opacity={0.6} />
-        <div className="tracker-head">
-          <div>
-            <div className="tracker-title deboss" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <Footsteps size={17} /> Step sensor
-            </div>
-            <div className="tracker-sub">
-              {STATUS_COPY[trackerStatus]}
-              {trackerDetail && trackerStatus === 'running' ? ` · ${trackerDetail}` : ''}
-            </div>
-          </div>
-        </div>
-        <div className="tracker-actions">
-          <button className="btn btn--primary" style={{ flex: 1 }} onClick={onToggleSensor}>
-            {sensorOn ? <Pause size={14} /> : <Play size={14} />}
-            {sensorOn ? 'Pause sensor' : 'Start sensor'}
-          </button>
-          <button className="btn btn--ghost" onClick={onToggleSim}>
-            {simulating ? 'Stop demo' : 'Demo walk'}
-          </button>
-        </div>
-        <div className="hint" style={{ color: 'rgba(20,11,7,.6)' }}>
-          Real counting uses the accelerometer. The demo walk adds steps at a walking pace so you can
-          see the dial and reminders work.
+        <div className="dial-reminder">
+          <Bell size={11} />
+          <span>
+            Reminder {prettyTime(state.reminderTime)} · in {humanGap(mins)}
+          </span>
         </div>
       </section>
 

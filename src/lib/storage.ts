@@ -20,7 +20,7 @@ export const DEFAULT_STATE: AppState = {
   goal: 8000,
   reminderTime: '20:00',
   strideMeters: 0.72,
-  sensitivity: 3,
+  sensitivity: 2,
   days: {},
   seeded: false,
 }

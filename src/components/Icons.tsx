@@ -106,6 +106,13 @@ export const Arrow = ({ size = 16, className, style }: P) => (
   </svg>
 )
 
+export const House = ({ size = 19, className, style }: P) => (
+  <svg {...base(size)} className={className} style={style}>
+    <path d="M3.6 10.4 12 3.6l8.4 6.8" />
+    <path d="M5.6 9.4V19a1.4 1.4 0 0 0 1.4 1.4h3.1v-5.2h3.8v5.2H17a1.4 1.4 0 0 0 1.4-1.4V9.4" />
+  </svg>
+)
+
 export const Compass = ({ size = 20, className, style }: P) => (
   <svg {...base(size)} className={className} style={style}>
     <circle cx="12" cy="12" r="8.6" />

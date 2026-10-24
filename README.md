@@ -14,8 +14,10 @@ slipping away short of your mark, it says so in plain words:
 
 - **First run asks two things** — your daily step target (2,000–20,000, with presets) and your
   reminder time. Nothing else.
-- **Counts real steps** from the accelerometer, with a hysteresis peak detector, gravity tracking
-  and a refractory window so a bumpy ride doesn't inflate the count.
+- **Counts real steps** from the accelerometer — and only real ones. Gravity is tracked per axis,
+  the signed vertical bounce is smoothed and detected with hysteresis, and a footfall is credited
+  only once the **rhythm** holds: peaks must fall inside a human cadence window (0.3–1.5 s apart)
+  with low variance. Picking the phone up, waving it or a bumpy bus ride never commits steps.
 - **Reminds you once a day** at your chosen hour, with live copy that reflects exactly how many
   steps are still missing. Native Android builds use a repeating local notification; the web build
   fires a browser notification while the app is open and always shows an in-app nudge.
@@ -46,9 +48,9 @@ npm run dev          # http://localhost:5173
 npm run build        # production bundle in dist/
 ```
 
-On a desktop browser there is no accelerometer, so use **Demo walk** on the Today screen to watch
-the dial, stats and reminder copy work in real time. On a phone, **Start sensor** asks for motion
-access and counts for real.
+The sensor starts by itself after onboarding — there is nothing to switch on. On a desktop browser
+there is no accelerometer, so use **Demo walk** in **Tune** to watch the dial and stats move. Step
+detection strictness (1–5) and stride length live in Tune too.
 
 ## Get the APK
 

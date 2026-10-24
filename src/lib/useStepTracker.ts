@@ -28,7 +28,10 @@ export function useStepTracker({ enabled, sensitivity, onStep }: Options) {
 
   useEffect(() => {
     if (!detector.current) {
-      detector.current = new StepDetector(sensitivity, () => onStepRef.current())
+      detector.current = new StepDetector({
+        sensitivity,
+        onStep: () => onStepRef.current(),
+      })
     } else {
       detector.current.setSensitivity(sensitivity)
     }

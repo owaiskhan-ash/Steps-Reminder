@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Stitch } from '../components/Stitch'
-import { Bell, Clock, Footsteps, Ruler, Spark } from '../components/Icons'
+import { Modal } from '../components/Modal'
+import { Bell, Clock, Footsteps, House, Play, Ruler, Pause } from '../components/Icons'
 import { fmt, minutesUntil, prettyTime } from '../lib/format'
 import type { AppState } from '../lib/storage'
 import { testNotification } from '../lib/notify'
@@ -8,26 +9,35 @@ import { testNotification } from '../lib/notify'
 type Props = {
   state: AppState
   steps: number
+  simulating: boolean
   onGoal: (goal: number) => void
   onTime: (time: string) => void
   onSensitivity: (n: number) => void
   onStride: (n: number) => void
+  onToggleSim: () => void
   onReset: () => void
+  onGoHome: () => void
   onToast: (title: string, body: string) => void
 }
+
+const SENSITIVITY_LABELS = ['Strictest', 'Strict', 'Balanced', 'Loose', 'Loosest']
 
 export function Settings({
   state,
   steps,
+  simulating,
   onGoal,
   onTime,
   onSensitivity,
   onStride,
+  onToggleSim,
   onReset,
+  onGoHome,
   onToast,
 }: Props) {
   const [confirmReset, setConfirmReset] = useState(false)
   const remaining = Math.max(0, state.goal - steps)
+  const untilReminder = minutesUntil(state.reminderTime)
 
   return (
     <div className="screen">
@@ -36,9 +46,9 @@ export function Settings({
           <div className="brand-name">Preferences</div>
           <div className="brand-sub">Tuned to your pace</div>
         </div>
-        <div className="reminder-icon" style={{ width: 38, height: 38 }}>
-          <Spark size={18} />
-        </div>
+        <button className="icon-btn" onClick={onGoHome} aria-label="Back to today">
+          <House size={19} />
+        </button>
       </header>
 
       <section className="card card--leather">
@@ -84,8 +94,7 @@ export function Settings({
             Reminder time
           </span>
           <span className="field-value" style={{ fontSize: 13 }}>
-            in {Math.floor(minutesUntil(state.reminderTime) / 60)}h{' '}
-            {minutesUntil(state.reminderTime) % 60}m
+            in {Math.floor(untilReminder / 60)}h {untilReminder % 60}m
           </span>
         </div>
         <div className="time-row">
@@ -120,11 +129,11 @@ export function Settings({
       <section className="card card--suede">
         <Stitch inset={6} radius={16} color="rgba(74,45,22,.7)" opacity={0.6} />
         <div className="field-label">
-          <span className="label" style={{ color: 'rgba(20,11,7,.68)' }}>
-            Sensor sensitivity
+          <span className="label" style={{ color: 'rgba(20,11,7,.6)' }}>
+            Step detection
           </span>
           <span className="field-value" style={{ color: '#140b07' }}>
-            {['Light', 'Soft', 'Balanced', 'Firm', 'Heavy'][Math.min(4, Math.max(0, state.sensitivity - 1))]}
+            {SENSITIVITY_LABELS[Math.min(4, Math.max(0, state.sensitivity - 1))]}
           </span>
         </div>
         <input
@@ -135,22 +144,23 @@ export function Settings({
           step={1}
           value={state.sensitivity}
           onChange={(e) => onSensitivity(Number(e.target.value))}
-          aria-label="Step sensor sensitivity"
+          aria-label="Step detection sensitivity"
         />
         <p className="hint" style={{ color: 'rgba(20,11,7,.62)' }}>
-          Turn it down for light footfalls, up if a bumpy commute adds phantom steps.
+          Steps only count when the rhythm of your walking is steady — picking up or shaking the
+          phone adds nothing. Go stricter if it still over-counts.
         </p>
 
         <div style={{ height: 1, background: 'rgba(74,45,22,.18)', margin: '16px 0 4px' }} />
 
         <div className="field-label" style={{ marginTop: 12 }}>
-          <span className="label" style={{ color: 'rgba(20,11,7,.68)' }}>
+          <span className="label" style={{ color: 'rgba(20,11,7,.6)' }}>
             <Ruler size={12} style={{ verticalAlign: '-2px', marginRight: 6 }} />
             Stride length
           </span>
           <span className="field-value" style={{ color: '#140b07', fontSize: 17 }}>
             {(state.strideMeters * 100).toFixed(0)}
-            <small style={{ color: 'rgba(20,11,7,.56)' }}>cm</small>
+            <small style={{ color: 'rgba(20,11,7,.55)' }}>cm</small>
           </span>
         </div>
         <input
@@ -169,12 +179,33 @@ export function Settings({
         <Stitch inset={6} radius={16} opacity={0.3} />
         <div className="settings-row" style={{ paddingTop: 0 }}>
           <div>
+            <div className="settings-row-title">Demo walk</div>
+            <div className="settings-row-sub">
+              Adds steps at a walking pace so you can preview the dial. Real counting uses the
+              sensor.
+            </div>
+          </div>
+          <button
+            className="btn btn--felt"
+            onClick={onToggleSim}
+            style={{ padding: '10px 13px', flex: 'none' }}
+          >
+            {simulating ? <Pause size={13} /> : <Play size={13} />}
+            {simulating ? 'Stop' : 'Start'}
+          </button>
+        </div>
+        <div className="settings-row">
+          <div>
             <div className="settings-row-title">Reset everything</div>
             <div className="settings-row-sub">
               Clears your goal, reminder and all recorded days on this device.
             </div>
           </div>
-          <button className="btn btn--felt" onClick={() => setConfirmReset(true)} style={{ padding: '10px 13px' }}>
+          <button
+            className="btn btn--felt"
+            onClick={() => setConfirmReset(true)}
+            style={{ padding: '10px 13px', flex: 'none' }}
+          >
             Reset
           </button>
         </div>
@@ -182,34 +213,30 @@ export function Settings({
           <div>
             <div className="settings-row-title">SC · Step Reminder</div>
             <div className="settings-row-sub">
-              Version 1.0 · leather, felt and suede · made quietly
+              Version 1.1.1 · leather, felt and suede · made quietly
             </div>
           </div>
         </div>
       </section>
 
-      {confirmReset && (
-        <div className="modal-scrim" onClick={() => setConfirmReset(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h2>Start over?</h2>
-            <p>Your goal, reminder time and every recorded day will be removed from this device.</p>
-            <div className="modal-actions">
-              <button className="btn btn--felt" onClick={() => setConfirmReset(false)}>
-                Keep it
-              </button>
-              <button
-                className="btn btn--primary"
-                onClick={() => {
-                  setConfirmReset(false)
-                  onReset()
-                }}
-              >
-                Reset
-              </button>
-            </div>
-          </div>
+      <Modal open={confirmReset} onClose={() => setConfirmReset(false)}>
+        <h2>Start over?</h2>
+        <p>Your goal, reminder time and every recorded day will be removed from this device.</p>
+        <div className="modal-actions">
+          <button className="btn btn--felt" onClick={() => setConfirmReset(false)}>
+            Keep it
+          </button>
+          <button
+            className="btn btn--primary"
+            onClick={() => {
+              setConfirmReset(false)
+              onReset()
+            }}
+          >
+            Reset
+          </button>
         </div>
-      )}
+      </Modal>
 
       <p className="footnote" style={{ marginTop: 'auto' }}>
         Reminders use local notifications. No account, no cloud, no tracking.
