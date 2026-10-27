@@ -142,7 +142,27 @@ if (hasAndroid) {
     </g>
   </svg>`)
   await sharp(silhouette).resize(96, 96).png().toFile(join(statusDir, 'ic_stat_sc.png'))
-  console.log('Android launcher + notification icons written')
+
+  // 1x1 home screen widget preview (95% transparent background, white footsteps + daily count).
+  const widgetPreview = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 64 64">
+    <defs>
+      <filter id="ws" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="0.8" stdDeviation="1.1" flood-color="#000000" flood-opacity="0.45"/>
+      </filter>
+    </defs>
+    <rect x="4" y="4" width="56" height="56" rx="16" fill="#000000" fill-opacity="0.05"/>
+    <g filter="url(#ws)" fill="#ffffff">
+      <g transform="translate(23.5, 11.5) scale(0.7083)">
+        <path d="M 7.4 1.8 C 4.8 1.8 3.2 4.3 3.4 7.4 C 3.5 9.7 4.4 11.2 4.5 12.7 L 8.9 12.7 C 8.9 11.0 10.3 9.2 10.4 6.6 C 10.5 3.8 9.4 1.8 7.4 1.8 Z"/>
+        <path d="M 4.6 14.3 L 8.8 14.3 L 8.8 15.3 C 8.8 16.9 7.9 18.0 6.7 18.0 C 5.5 18.0 4.6 16.9 4.6 15.3 Z"/>
+        <path d="M 16.6 6.0 C 14.6 6.0 13.5 8.0 13.6 10.8 C 13.7 13.4 15.1 15.2 15.1 16.9 L 19.5 16.9 C 19.6 15.4 20.5 13.9 20.6 11.6 C 20.8 8.5 19.2 6.0 16.6 6.0 Z"/>
+        <path d="M 15.2 18.5 L 19.4 18.5 L 19.4 19.5 C 19.4 21.1 18.5 22.2 17.3 22.2 C 16.1 22.2 15.2 21.1 15.2 19.5 Z"/>
+      </g>
+      <text x="32" y="43.5" font-family="Helvetica, Arial, sans-serif" font-size="11.5" font-weight="700" text-anchor="middle">6,420</text>
+    </g>
+  </svg>`)
+  await sharp(widgetPreview).resize(192, 192).png().toFile(join(statusDir, 'widget_preview.png'))
+  console.log('Android launcher + notification + widget icons written')
 }
 
 console.log('Icons generated in public/icons')

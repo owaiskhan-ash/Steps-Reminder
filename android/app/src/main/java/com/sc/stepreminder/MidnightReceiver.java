@@ -12,11 +12,15 @@ import android.content.Intent;
 public class MidnightReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
+        final Context appContext = context.getApplicationContext();
+        final PendingResult pending = goAsync();
         new Thread(() -> {
             try {
-                StepStore.rollover(context);
+                StepStore.rollover(appContext);
+                StepWidgetProvider.updateAllFromCache(appContext);
             } finally {
-                StepStore.scheduleMidnight(context);
+                StepStore.scheduleMidnight(appContext);
+                pending.finish();
             }
         }).start();
     }

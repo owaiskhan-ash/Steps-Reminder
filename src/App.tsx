@@ -17,6 +17,7 @@ import {
 } from './lib/storage'
 import { useStepTracker } from './lib/useStepTracker'
 import { useStepSync } from './lib/useStepSync'
+import { syncHomeWidget } from './lib/nativeSteps'
 import {
   buzz,
   fireInAppReminder,
@@ -29,7 +30,7 @@ import { clearReminderCopy } from './lib/notify'
 export default function App() {
   const [state, setState] = useState<AppState>(() => seedHistory(loadState()))
   const [tab, setTab] = useState<Tab>('today')
-  // The sensor starts itself — there is no longer a widget on the home screen.
+  // Counting starts automatically once onboarded; the 1x1 home widget mirrors today's total.
   const [sensorOn, setSensorOn] = useState<boolean>(() => loadState().onboarded)
   const [toasts, setToasts] = useState<ToastItem[]>([])
   const [dayKey, setDayKey] = useState(todayKey())
@@ -39,6 +40,12 @@ export default function App() {
   const remaining = Math.max(0, state.goal - steps)
 
   useEffect(() => saveState(state), [state])
+
+  // Keep the 1x1 Android home screen widget aligned with today's step count.
+  useEffect(() => {
+    if (!state.onboarded) return
+    void syncHomeWidget(steps)
+  }, [state.onboarded, steps, dayKey])
 
   const pushToast = useCallback((title: string, body: string) => {
     setToasts((prev) => [
@@ -203,6 +210,7 @@ export default function App() {
 
   const reset = () => {
     clearState()
+    void syncHomeWidget(0, true)
     setSensorOn(false)
     clearReminderCopy()
     setTab('today')

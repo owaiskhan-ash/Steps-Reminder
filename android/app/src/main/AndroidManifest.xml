@@ -25,6 +25,19 @@
 
         </activity>
 
+        <!-- 95% transparent 1x1 home screen step widget. -->
+        <receiver
+            android:name=".StepWidgetProvider"
+            android:label="@string/widget_label"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/step_widget_info" />
+        </receiver>
+
         <!-- Banks the day's step total just after midnight, and re-arms after reboot. -->
         <receiver android:name=".MidnightReceiver" android:exported="false" />
         <receiver android:name=".BootReceiver" android:exported="true">

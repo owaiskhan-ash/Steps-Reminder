@@ -25,6 +25,9 @@ type StepCounterPlugin = {
   getTodaySteps(): Promise<PedometerReading>
   getRawCounter(): Promise<{ counter: number }>
   bankToday(): Promise<{ ok: boolean; history: string }>
+  syncWidget(options: { steps: number; reset?: boolean }): Promise<{ ok: boolean; steps?: number }>
+  getWidgetStatus(): Promise<{ supported: boolean; pinSupported: boolean; count: number }>
+  requestPinWidget(): Promise<{ requested: boolean }>
   start(): Promise<void>
   stop(): Promise<void>
   addListener(event: 'step', listener: () => void): Promise<PluginListenerHandle>
@@ -90,5 +93,42 @@ export async function bankToday(): Promise<Record<string, number> | null> {
     return JSON.parse(history) as Record<string, number>
   } catch {
     return null
+  }
+}
+
+export type HomeWidgetStatus = {
+  supported: boolean
+  pinSupported: boolean
+  count: number
+}
+
+/** Pushes the current daily step count (or a full reset) to the 1x1 home widget. */
+export async function syncHomeWidget(steps: number, reset = false): Promise<void> {
+  if (!nativeStepsSupported()) return
+  try {
+    await StepCounter.syncWidget({ steps: Math.max(0, Math.round(steps)), reset })
+  } catch {
+    /* ignore */
+  }
+}
+
+export async function getHomeWidgetStatus(): Promise<HomeWidgetStatus> {
+  if (!nativeStepsSupported()) {
+    return { supported: false, pinSupported: false, count: 0 }
+  }
+  try {
+    return await StepCounter.getWidgetStatus()
+  } catch {
+    return { supported: true, pinSupported: false, count: 0 }
+  }
+}
+
+export async function pinHomeWidget(): Promise<'requested' | 'manual' | 'unsupported'> {
+  if (!nativeStepsSupported()) return 'unsupported'
+  try {
+    const { requested } = await StepCounter.requestPinWidget()
+    return requested ? 'requested' : 'manual'
+  } catch {
+    return 'manual'
   }
 }

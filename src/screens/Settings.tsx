@@ -1,8 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Stitch } from '../components/Stitch'
 import { Modal } from '../components/Modal'
 import { Bell, Clock, Footsteps, House, Ruler } from '../components/Icons'
-import type { StepSource } from '../lib/nativeSteps'
+import {
+  getHomeWidgetStatus,
+  nativeStepsSupported,
+  pinHomeWidget,
+  type HomeWidgetStatus,
+  type StepSource,
+} from '../lib/nativeSteps'
 import { fmt, minutesUntil, prettyTime } from '../lib/format'
 import type { AppState } from '../lib/storage'
 import { testNotification } from '../lib/notify'
@@ -43,8 +49,31 @@ export function Settings({
   onToast,
 }: Props) {
   const [confirmReset, setConfirmReset] = useState(false)
+  const [widgetStatus, setWidgetStatus] = useState<HomeWidgetStatus>({
+    supported: nativeStepsSupported(),
+    pinSupported: false,
+    count: 0,
+  })
   const remaining = Math.max(0, state.goal - steps)
   const untilReminder = minutesUntil(state.reminderTime)
+
+  useEffect(() => {
+    let alive = true
+    const refresh = () => {
+      void getHomeWidgetStatus().then((s) => {
+        if (alive) setWidgetStatus(s)
+      })
+    }
+    refresh()
+    const onVis = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => {
+      alive = false
+      document.removeEventListener('visibilitychange', onVis)
+    }
+  }, [])
 
   return (
     <div className="screen">
@@ -219,6 +248,59 @@ export function Settings({
 
       <section className="card card--felt">
         <Stitch inset={6} radius={16} opacity={0.3} />
+        <div className="settings-row" style={{ paddingTop: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+            <div className="widget-swatch" aria-hidden="true">
+              <div className="widget-tile">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#ffffff">
+                  <path d="M 7.4 1.8 C 4.8 1.8 3.2 4.3 3.4 7.4 C 3.5 9.7 4.4 11.2 4.5 12.7 L 8.9 12.7 C 8.9 11.0 10.3 9.2 10.4 6.6 C 10.5 3.8 9.4 1.8 7.4 1.8 Z" />
+                  <path d="M 4.6 14.3 L 8.8 14.3 L 8.8 15.3 C 8.8 16.9 7.9 18.0 6.7 18.0 C 5.5 18.0 4.6 16.9 4.6 15.3 Z" />
+                  <path d="M 16.6 6.0 C 14.6 6.0 13.5 8.0 13.6 10.8 C 13.7 13.4 15.1 15.2 15.1 16.9 L 19.5 16.9 C 19.6 15.4 20.5 13.9 20.6 11.6 C 20.8 8.5 19.2 6.0 16.6 6.0 Z" />
+                  <path d="M 15.2 18.5 L 19.4 18.5 L 19.4 19.5 C 19.4 21.1 18.5 22.2 17.3 22.2 C 16.1 22.2 15.2 21.1 15.2 19.5 Z" />
+                </svg>
+                <span className="widget-tile-steps">
+                  {steps >= 100000 ? `${Math.floor(steps / 1000)}k` : fmt(steps)}
+                </span>
+              </div>
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div className="settings-row-title">Home screen widget · 1×1</div>
+              <div className="settings-row-sub">
+                {widgetStatus.count > 0
+                  ? `${widgetStatus.count} placed on home screen · 95% transparent white footsteps & daily count.`
+                  : '95% transparent 1×1 tile with white footsteps and your daily step count.'}
+              </div>
+            </div>
+          </div>
+          {widgetStatus.supported ? (
+            <button
+              className="btn btn--felt"
+              style={{ padding: '10px 13px', flex: 'none' }}
+              onClick={async () => {
+                const outcome = await pinHomeWidget()
+                if (outcome === 'requested') {
+                  onToast(
+                    'Pin 1×1 widget',
+                    'Confirm in your launcher prompt, or drag Steps (1×1) onto your home screen.',
+                  )
+                } else {
+                  onToast(
+                    'Add from home screen',
+                    'Long-press your home screen → Widgets → SC Step Reminder → Steps (1×1).',
+                  )
+                }
+                const next = await getHomeWidgetStatus()
+                setWidgetStatus(next)
+              }}
+            >
+              {widgetStatus.count > 0 ? 'Add another' : 'Add 1×1'}
+            </button>
+          ) : (
+            <span className="chip" style={{ flex: 'none' }}>
+              Android APK
+            </span>
+          )}
+        </div>
         <div className="settings-row">
           <div>
             <div className="settings-row-title">Reset everything</div>
@@ -238,7 +320,7 @@ export function Settings({
           <div>
             <div className="settings-row-title">SC · Step Reminder</div>
             <div className="settings-row-sub">
-              Version 1.3.5 · leather, felt and suede · made quietly
+              Version 1.4.0 · leather, felt and suede · made quietly
             </div>
           </div>
         </div>

@@ -41,6 +41,9 @@ slipping away short of your mark, it says so in plain words:
 - **Reminds you once a day** at your chosen hour, with live copy that reflects exactly how many
   steps are still missing. Native Android builds use a repeating local notification; the web build
   fires a browser notification while the app is open and always shows an in-app nudge.
+- **Minimal 1×1 home screen widget.** A 95% transparent 1×1 Android widget with just a small white
+  footsteps icon and your daily step count in white — add it from Preferences or your launcher's
+  Widgets sheet, and tap it anytime to open SC.
 - **Tells the story** — dial with remaining steps and minutes of walking, distance, energy, streak,
   last seven days, and a daily ledger.
 - **Stays local** — goal, reminder and history live in `localStorage`. No account, no cloud, no

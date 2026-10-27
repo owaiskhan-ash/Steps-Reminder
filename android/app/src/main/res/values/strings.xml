@@ -4,4 +4,7 @@
     <string name="title_activity_main">SC Step Reminder</string>
     <string name="package_name">com.sc.stepreminder</string>
     <string name="custom_url_scheme">com.sc.stepreminder</string>
+    <string name="widget_label">Steps (1×1)</string>
+    <string name="widget_description">95% transparent 1×1 daily step count</string>
+    <string name="widget_icon_desc">Daily footsteps</string>
 </resources>
